@@ -12,9 +12,9 @@ class ViewProduct extends StatefulWidget {
 class _ViewProductState extends State<ViewProduct> {
   @override
   Widget build(BuildContext context) {
-    final arguments =
-    ModalRoute.of(context)!.settings.arguments as ProductsModel;
+    final arguments = ModalRoute.of(context)!.settings.arguments as ProductsModel;
 
+    // ✅ Pass double values safely
     final discount = discountPercent(arguments.old_price, arguments.new_price);
 
     return Scaffold(
@@ -26,7 +26,7 @@ class _ViewProductState extends State<ViewProduct> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🖼 Product image with graceful loading
+            // 🖼 Product image
             AspectRatio(
               aspectRatio: 1.1,
               child: Image.network(
@@ -34,13 +34,10 @@ class _ViewProductState extends State<ViewProduct> {
                 fit: BoxFit.contain,
                 loadingBuilder: (context, child, progress) {
                   if (progress == null) return child;
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
+                  return const Center(child: CircularProgressIndicator());
                 },
-                errorBuilder: (context, error, stackTrace) => const Center(
-                  child: Icon(Icons.broken_image, size: 80, color: Colors.grey),
-                ),
+                errorBuilder: (context, error, stackTrace) =>
+                const Center(child: Icon(Icons.broken_image, size: 80, color: Colors.grey)),
               ),
             ),
             Padding(
@@ -53,15 +50,14 @@ class _ViewProductState extends State<ViewProduct> {
                     arguments.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                        fontSize: 22, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 10),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        "₹${arguments.old_price}",
+                        "KSh ${arguments.old_price.toStringAsFixed(2)}",
                         style: TextStyle(
                           fontSize: 18,
                           color: Colors.grey.shade600,
@@ -70,21 +66,15 @@ class _ViewProductState extends State<ViewProduct> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        "₹${arguments.new_price}",
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                        ),
+                        "KSh ${arguments.new_price.toStringAsFixed(2)}",
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(Icons.arrow_downward,
-                          color: Colors.green, size: 18),
+                      const Icon(Icons.arrow_downward, color: Colors.green, size: 18),
                       Text(
-                        "$discount%",
+                        "${discount.toStringAsFixed(0)}%",
                         style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green),
+                            fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
                       ),
                     ],
                   ),
@@ -93,16 +83,12 @@ class _ViewProductState extends State<ViewProduct> {
                       ? const Text(
                     "Out of Stock",
                     style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.red),
+                        fontSize: 16, fontWeight: FontWeight.w600, color: Colors.red),
                   )
                       : Text(
                     "Only ${arguments.maxQuantity} left in stock",
                     style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.green),
+                        fontSize: 16, fontWeight: FontWeight.w600, color: Colors.green),
                   ),
                   const SizedBox(height: 12),
                   Text(
@@ -137,10 +123,7 @@ class _ViewProductState extends State<ViewProduct> {
                   foregroundColor: Colors.white,
                   shape: const RoundedRectangleBorder(),
                 ),
-                child: const Text(
-                  "Add to Cart",
-                  style: TextStyle(fontSize: 16),
-                ),
+                child: const Text("Add to Cart", style: TextStyle(fontSize: 16)),
               ),
             ),
           ),
@@ -158,10 +141,7 @@ class _ViewProductState extends State<ViewProduct> {
                   foregroundColor: Theme.of(context).primaryColor,
                   shape: const RoundedRectangleBorder(),
                 ),
-                child: const Text(
-                  "Buy Now",
-                  style: TextStyle(fontSize: 16),
-                ),
+                child: const Text("Buy Now", style: TextStyle(fontSize: 16)),
               ),
             ),
           ),
