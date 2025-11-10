@@ -32,29 +32,26 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("What do you want to do?"),
+        title: const Text("Choose Action"),
         content: const Text("Deleting cannot be undone."),
         actions: [
-          // ✅ DELETE BUTTON
+          // DELETE BUTTON
           TextButton(
             onPressed: _isLoading
                 ? null
                 : () {
-              Navigator.pop(context); // Close main action dialog
+              Navigator.pop(context); // Close main dialog
               showDialog(
                 context: context,
                 builder: (context) => AdditionalConfirm(
                   contentText: "Are you sure you want to delete this item?",
                   onYes: () async {
                     setState(() => _isLoading = true);
-
-                    // Capture these before await to avoid context issues
-                    final navigator = Navigator.of(context);
                     final messenger = ScaffoldMessenger.of(context);
+                    final navigator = Navigator.of(context);
 
                     try {
                       await DbService.instance.deletePromo(_isPromo, promo.id);
-
 
                       if (!mounted) return;
 
@@ -64,8 +61,8 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
                       messenger.showSnackBar(
                         SnackBar(
                           content: Text(
-                            "${_isPromo ? "Promo" : "Banner"} deleted successfully.",
-                          ),
+                              "${_isPromo ? "Promo" : "Banner"} deleted successfully"),
+                          backgroundColor: Colors.redAccent,
                         ),
                       );
                     } catch (e) {
@@ -84,7 +81,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
             child: Text("Delete ${_isPromo ? "Promo" : "Banner"}"),
           ),
 
-          // ✅ UPDATE BUTTON
+          // UPDATE BUTTON
           TextButton(
             onPressed: _isLoading
                 ? null
@@ -115,14 +112,11 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isPromo ? "Promos" : "Banners"),
-      ),
+      appBar: AppBar(title: Text(_isPromo ? "Promos" : "Banners")),
       body: Stack(
         children: [
           StreamBuilder(
-            stream: DbService.instance
-                .readPromos(_isPromo),
+            stream: DbService.instance.readPromos(_isPromo),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -130,61 +124,88 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
 
               if (snapshot.hasError) {
                 return Center(
-                  child: Text("Error loading ${_isPromo ? "promos" : "banners"}"),
-                );
+                    child: Text("Error loading ${_isPromo ? "promos" : "banners"}"));
               }
 
               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                 return Center(
-                  child: Text("No ${_isPromo ? "Promos" : "Banners"} found"),
-                );
+                    child: Text("No ${_isPromo ? "Promos" : "Banners"} found"));
               }
 
               final promos = PromoBannersModel.fromJsonList(snapshot.data!.docs);
 
-              return ListView.builder(
+              return ListView.separated(
+                padding: const EdgeInsets.all(12),
                 itemCount: promos.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, index) {
                   final promo = promos[index];
-                  return ListTile(
+                  return InkWell(
                     onTap: () => _showActionDialog(promo),
-                    leading: ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: Image.network(
-                        promo.image,
-                        height: 50,
-                        width: 50,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.broken_image),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple.shade50,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    title: Text(
-                      promo.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    subtitle: Text(promo.category),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                        Navigator.pushNamed(
-                          context,
-                          "/update_promo",
-                          arguments: {
-                            "promo": _isPromo,
-                            "detail": promo,
-                          },
-                        );
-                      },
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: Image.network(
+                              promo.image,
+                              height: 60,
+                              width: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.broken_image),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  promo.title,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  promo.category,
+                                  style: const TextStyle(color: Colors.black54),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                              Navigator.pushNamed(
+                                context,
+                                "/update_promo",
+                                arguments: {
+                                  "promo": _isPromo,
+                                  "detail": promo,
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },
               );
             },
           ),
+
           if (_isLoading)
             Container(
               color: Colors.black26,

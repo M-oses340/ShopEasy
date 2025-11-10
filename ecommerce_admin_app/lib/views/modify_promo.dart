@@ -66,9 +66,20 @@ class _ModifyPromoState extends State<ModifyPromo> {
 
     if (url != null) {
       messenger.showSnackBar(
-        const SnackBar(content: Text("Image uploaded successfully")),
+        const SnackBar(
+          content: Text("Image uploaded successfully"),
+          backgroundColor: Colors.green,
+        ),
       );
     }
+  }
+
+  /// Remove selected image
+  void removeImage() {
+    setState(() {
+      pickedImage = null;
+      imageController.clear();
+    });
   }
 
   /// Save promo or banner safely
@@ -91,13 +102,19 @@ class _ModifyPromoState extends State<ModifyPromo> {
         await DbService.instance.createPromo(_isPromo, data);
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text("${_isPromo ? "Promo" : "Banner"} Added")),
+          SnackBar(
+            content: Text("${_isPromo ? "Promo" : "Banner"} Added"),
+            backgroundColor: Colors.green,
+          ),
         );
       } else {
         await DbService.instance.updatePromo(_isPromo, promoId, data);
         if (!mounted) return;
         messenger.showSnackBar(
-          SnackBar(content: Text("${_isPromo ? "Promo" : "Banner"} Updated")),
+          SnackBar(
+            content: Text("${_isPromo ? "Promo" : "Banner"} Updated"),
+            backgroundColor: Colors.green,
+          ),
         );
       }
 
@@ -119,44 +136,55 @@ class _ModifyPromoState extends State<ModifyPromo> {
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(12),
             child: Form(
               key: formKey,
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Title
                   TextFormField(
                     controller: titleController,
                     validator: (v) => v!.isEmpty ? "This cannot be empty" : null,
-                    decoration: const InputDecoration(labelText: "Title"),
+                    decoration: const InputDecoration(
+                      labelText: "Title",
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
                   // Category
                   TextFormField(
                     controller: categoryController,
                     readOnly: true,
                     validator: (v) => v!.isEmpty ? "This cannot be empty" : null,
-                    decoration: const InputDecoration(labelText: "Category"),
+                    decoration: const InputDecoration(
+                      labelText: "Category",
+                      border: OutlineInputBorder(),
+                    ),
                     onTap: () {
                       showDialog(
                         context: context,
                         builder: (context) => AlertDialog(
                           title: const Text("Select Category"),
-                          content: Consumer<AdminProvider>(
-                            builder: (context, value, child) => Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: value.categories
-                                  .map(
-                                    (e) => TextButton(
-                                  onPressed: () {
-                                    categoryController.text = e["name"];
-                                    Navigator.pop(context);
-                                  },
-                                  child: Text(e["name"]),
+                          content: SizedBox(
+                            width: double.maxFinite,
+                            child: SingleChildScrollView(
+                              child: Consumer<AdminProvider>(
+                                builder: (context, value, child) => Column(
+                                  children: value.categories
+                                      .map(
+                                        (e) => ListTile(
+                                      title: Text(e["name"]),
+                                      onTap: () {
+                                        categoryController.text = e["name"];
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                  )
+                                      .toList(),
                                 ),
-                              )
-                                  .toList(),
+                              ),
                             ),
                           ),
                         ),
@@ -165,28 +193,40 @@ class _ModifyPromoState extends State<ModifyPromo> {
                   ),
                   const SizedBox(height: 20),
 
-                  // Image preview
+                  // Image preview + remove
                   if (pickedImage != null || imageController.text.isNotEmpty)
-                    Container(
-                      height: 150,
-                      width: double.infinity,
-                      color: Colors.deepPurple.shade50,
-                      child: pickedImage != null
-                          ? Image.file(File(pickedImage!.path), fit: BoxFit.contain)
-                          : Image.network(imageController.text, fit: BoxFit.contain),
+                    Stack(
+                      children: [
+                        Container(
+                          height: 150,
+                          width: double.infinity,
+                          color: Colors.deepPurple.shade50,
+                          child: pickedImage != null
+                              ? Image.file(File(pickedImage!.path), fit: BoxFit.contain)
+                              : Image.network(imageController.text, fit: BoxFit.contain),
+                        ),
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.red),
+                            onPressed: removeImage,
+                          ),
+                        ),
+                      ],
                     ),
                   const SizedBox(height: 10),
 
                   // Pick Image Button
-                  ElevatedButton(
+                  ElevatedButton.icon(
                     onPressed: _isLoading ? null : pickImage,
-                    child: const Text("Pick Image"),
+                    icon: const Icon(Icons.image),
+                    label: const Text("Pick Image"),
                   ),
                   const SizedBox(height: 20),
 
                   // Save Button
                   SizedBox(
-                    width: double.infinity,
                     height: 55,
                     child: ElevatedButton(
                       onPressed: _isLoading ? null : savePromo,
