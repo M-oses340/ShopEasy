@@ -14,6 +14,7 @@ import 'package:ecommerce_admin_app/views/signup.dart';
 import 'package:ecommerce_admin_app/views/view_product.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
@@ -35,10 +36,36 @@ class MyApp extends StatelessWidget {
       create: (context) => AdminProvider(),
       builder: (context, child) => MaterialApp(
         title: 'Ecommerce Admin App',
+
+        // Automatically adapt to system theme
+        themeMode: ThemeMode.system,
+
+        // Light theme
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.light, // set brightness here
+          ),
           useMaterial3: true,
+          scaffoldBackgroundColor: Colors.white,
+          appBarTheme: const AppBarTheme(
+            systemOverlayStyle: SystemUiOverlayStyle.dark,
+          ),
         ),
+
+        // Dark theme
+        darkTheme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.dark, // set brightness here
+          ),
+          useMaterial3: true,
+          scaffoldBackgroundColor: Colors.black,
+          appBarTheme: const AppBarTheme(
+            systemOverlayStyle: SystemUiOverlayStyle.light,
+          ),
+        ),
+
         routes: {
           "/": (context) => const CheckUser(),
           "/login": (context) => const LoginPage(),
@@ -52,7 +79,6 @@ class MyApp extends StatelessWidget {
           "/promos": (context) => const PromoBannersPage(),
           "/coupons": (context) => const CouponsPage(),
           "/orders": (context) => const OrdersPage(),
-
         },
       ),
     );
