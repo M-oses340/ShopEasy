@@ -1,7 +1,9 @@
 import 'package:ecommerce_admin_app/controllers/db_service.dart';
 import 'package:ecommerce_admin_app/models/orders_model.dart';
-import 'package:ecommerce_admin_app/utils/date_formatter.dart';
+import 'package:ecommerce_admin_app/providers/admin_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:ecommerce_admin_app/utils/date_formatter.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -11,257 +13,287 @@ class OrdersPage extends StatefulWidget {
 }
 
 class _OrdersPageState extends State<OrdersPage> {
-  bool _isLoading = false;
+  totalQuantityCalculator(List<OrderProductModel> products) {
+    int qty = 0;
+    products.map((e) => qty += e.quantity).toList();
+    return qty;
+  }
 
-  // -------------------- Status Chip --------------------
-  Widget orderStatusChip(String status) {
-    final Map<String, Color> colors = {
-      "PAID": Colors.green,
-      "ON_THE_WAY": Colors.orange,
-      "DELIVERED": Colors.blue,
-      "CANCELLED": Colors.red,
-    };
+  Widget statusIcon(String status) {
+    if (status == "PAID") {
+      return statusContainer(
+          text: "PAID", bgColor: Colors.lightGreen, textColor: Colors.white);
+    }
+    if (status == "ON_THE_WAY") {
+      return statusContainer(
+          text: "ON THE WAY", bgColor: Colors.yellow, textColor: Colors.black);
+    } else if (status == "DELIVERED") {
+      return statusContainer(
+          text: "DELIVERED",
+          bgColor: Colors.green.shade700,
+          textColor: Colors.white);
+    } else {
+      return statusContainer(
+          text: "CANCELED", bgColor: Colors.red, textColor: Colors.white);
+    }
+  }
 
+  Widget statusContainer(
+      {required String text, required Color bgColor, required Color textColor}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors[status]?.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        status.replaceAll("_", " "),
-        style: TextStyle(
-          color: colors[status],
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      padding: const EdgeInsets.all(8),
+      color: bgColor,
+      child: Text(text, style: TextStyle(color: textColor)),
     );
   }
 
-  // -------------------- Summary Box --------------------
   Widget summaryBox(String label, int value, Color color) {
     return Container(
       height: 70,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withAlpha((0.15 * 255).round()), // replaced withOpacity
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withAlpha((0.3 * 255).round())), // replaced withOpacity
       ),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: Text(
-                label,
+            Text(label,
                 style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w500, color: color),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
+                    fontSize: 14, fontWeight: FontWeight.w500, color: color)),
             const SizedBox(height: 4),
-            Text(
-              "$value",
-              style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.bold, color: color),
-            ),
+            Text("$value",
+                style: TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.bold, color: color)),
           ],
         ),
       ),
     );
   }
 
-  // -------------------- Modify Order Dialog --------------------
-  Future<void> _modifyOrder(BuildContext parentContext, OrdersModel order) async {
-    await showDialog(
-      context: parentContext,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Modify this order"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          "Orders Dashboard",
+          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600),
+        ),
+      ),
+      body: Consumer<AdminProvider>(
+        builder: (context, value, child) {
+          List<OrdersModel> orders = OrdersModel.fromJsonList(value.orders);
+          if (orders.isEmpty) {
+            return const Center(
+              child: Text("No orders found"),
+            );
+          }
+
+          // Compute counts
+          final int cancelledCount =
+              orders.where((o) => o.status == "CANCELLED").length;
+          final int onTheWayCount =
+              orders.where((o) => o.status == "ON_THE_WAY").length;
+          final int paidCount = orders.where((o) => o.status == "PAID").length;
+          final int deliveredCount =
+              orders.where((o) => o.status == "DELIVERED").length;
+
+          return Column(
             children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 4),
-                child: Text("Choose status to set:"),
+              // Dashboard Summary
+              Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.deepPurple.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 2.2,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    summaryBox("Cancelled", cancelledCount, Colors.red),
+                    summaryBox("On the Way", onTheWayCount, Colors.orange),
+                    summaryBox("Paid", paidCount, Colors.green),
+                    summaryBox("Delivered", deliveredCount, Colors.blue),
+                  ],
+                ),
               ),
-              TextButton(
-                onPressed: () => _updateStatus(order, "PAID"),
-                child: const Text("Order Paid"),
-              ),
-              TextButton(
-                onPressed: () => _updateStatus(order, "ON_THE_WAY"),
-                child: const Text("Order Shipped"),
-              ),
-              TextButton(
-                onPressed: () => _updateStatus(order, "DELIVERED"),
-                child: const Text("Order Delivered"),
-              ),
-              TextButton(
-                onPressed: () => _updateStatus(order, "CANCELLED"),
-                child: const Text("Cancel Order"),
+
+              Expanded(
+                child: ListView.builder(
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final order = orders[index];
+                    return Card(
+                      child: ListTile(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ViewOrder(order: order),
+                            ),
+                          );
+                        },
+                        title: Text("Order by ${order.name}"),
+                        subtitle: Text(
+                            "Ordered ${formatRelativeTime(order.created_at)}"),
+                        trailing: statusIcon(order.status),
+                        onLongPress: () {
+                          showDialog(
+                              context: context,
+                              builder: (context) =>
+                                  ModifyOrder(order: order));
+                        },
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
+}
 
-  // -------------------- Update Order Status --------------------
-  Future<void> _updateStatus(OrdersModel order, String status) async {
+// ======================= VIEW ORDER PAGE =======================
+class ViewOrder extends StatelessWidget {
+  final OrdersModel order;
+  const ViewOrder({super.key, required this.order});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text("Order - ${order.name}")),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Customer: ${order.name}",
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold)),
+              Text("Phone: ${order.phone}"),
+              Text("Email: ${order.email}"),
+              const SizedBox(height: 20),
+              Text("Status: ${order.status}"),
+              Text("Ordered: ${formatRelativeTime(order.created_at)}"),
+              const SizedBox(height: 20),
+              const Text("Items:",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Column(
+                children: order.products
+                    .map((item) => Container(
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.symmetric(vertical: 4),
+                  decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(8)),
+                  child: Row(
+                    children: [
+                      Image.network(item.image,
+                          height: 50, width: 50, fit: BoxFit.cover),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Text(item.name,
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w500))),
+                      Text(
+                          "${item.quantity} x KSh${item.single_price} = KSh${item.total_price}"),
+                    ],
+                  ),
+                ))
+                    .toList(),
+              ),
+              const SizedBox(height: 20),
+              Text("Discount: KSh${order.discount}",
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+              Text("Total: KSh${order.total}",
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+
+class ModifyOrder extends StatefulWidget {
+  final OrdersModel order;
+  const ModifyOrder({super.key, required this.order});
+
+  @override
+  State<ModifyOrder> createState() => _ModifyOrderState();
+}
+
+class _ModifyOrderState extends State<ModifyOrder> {
+  bool _isLoading = false;
+
+  Future<void> updateStatus(String status) async {
     setState(() => _isLoading = true);
 
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+
     try {
-      // ✅ Named parameters match DbService
       await DbService.instance.updateOrderStatus(
-        docId: order.id,
+        docId: widget.order.id,
         data: {"status": status},
       );
 
       if (!mounted) return;
 
-      Navigator.of(context).pop(); // Close modify dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Order status updated to $status")),
+      navigator.pop(); // close the dialog
+      messenger.showSnackBar(
+        SnackBar(content: Text("Order updated to $status")),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Error: $e")));
+      messenger.showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // -------------------- Main Build --------------------
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Orders Dashboard"),
-      ),
-      body: Stack(
+    return AlertDialog(
+      title: const Text("Modify Order"),
+      content: _isLoading
+          ? const SizedBox(
+        height: 100,
+        child: Center(child: CircularProgressIndicator()),
+      )
+          : Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          StreamBuilder(
-            stream: DbService.instance.readOrders(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              if (snapshot.hasError) {
-                return const Center(child: Text("Error loading orders"));
-              }
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return const Center(child: Text("No orders found"));
-              }
-
-              final orders = OrdersModel.fromJsonList(snapshot.data!.docs);
-
-              // Compute status counts
-              final Map<String, int> statusCounts = {
-                "PAID": 0,
-                "ON_THE_WAY": 0,
-                "DELIVERED": 0,
-                "CANCELLED": 0,
-              };
-              for (var o in orders) {
-                statusCounts[o.status] = (statusCounts[o.status] ?? 0) + 1;
-              }
-
-              return Padding(
-                padding: const EdgeInsets.all(12.0),
-                child: Column(
-                  children: [
-                    // Summary
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.deepPurple.shade50,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.deepPurple.shade100),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            "Order Summary",
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 10),
-                          GridView.count(
-                            crossAxisCount: 2,
-                            shrinkWrap: true,
-                            crossAxisSpacing: 10,
-                            mainAxisSpacing: 10,
-                            physics: const NeverScrollableScrollPhysics(),
-                            childAspectRatio: 2.2,
-                            children: [
-                              summaryBox(
-                                  "Cancelled", statusCounts["CANCELLED"]!, Colors.red),
-                              summaryBox(
-                                  "On the Way", statusCounts["ON_THE_WAY"]!, Colors.orange),
-                              summaryBox("Paid", statusCounts["PAID"]!, Colors.green),
-                              summaryBox(
-                                  "Delivered", statusCounts["DELIVERED"]!, Colors.blue),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const Divider(thickness: 1),
-                    const SizedBox(height: 10),
-                    const Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        "Recent Orders",
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: orders.length,
-                        itemBuilder: (context, index) {
-                          final order = orders[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                                vertical: 4, horizontal: 2),
-                            child: ListTile(
-                              onTap: () => Navigator.pushNamed(
-                                context,
-                                "/view_order",
-                                arguments: order,
-                              ),
-                              title: Text("Order by ${order.name}",
-                                  style:
-                                  const TextStyle(fontWeight: FontWeight.w500)),
-                              subtitle: Text(
-                                  "Ordered ${formatRelativeTime(order.created_at)}",
-                                  style: const TextStyle(fontSize: 13)),
-                              trailing: orderStatusChip(order.status),
-                              onLongPress: () => _modifyOrder(context, order),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          if (_isLoading)
-            Container(
-              color: Colors.black26,
-              child: const Center(child: CircularProgressIndicator()),
-            ),
+          TextButton(
+              onPressed: () => updateStatus("PAID"),
+              child: const Text("Mark as Paid")),
+          TextButton(
+              onPressed: () => updateStatus("ON_THE_WAY"),
+              child: const Text("Mark as Shipped")),
+          TextButton(
+              onPressed: () => updateStatus("DELIVERED"),
+              child: const Text("Mark as Delivered")),
+          TextButton(
+              onPressed: () => updateStatus("CANCELLED"),
+              child: const Text("Cancel Order")),
         ],
       ),
     );
