@@ -40,7 +40,7 @@ class _ProductsPageState extends State<ProductsPage> {
                     final messenger = ScaffoldMessenger.of(context);
 
                     try {
-                      await DbService()
+                      await DbService.instance
                           .deleteProduct(docId: product.id);
 
                       if (!mounted) return;

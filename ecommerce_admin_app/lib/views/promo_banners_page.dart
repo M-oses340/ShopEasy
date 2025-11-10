@@ -53,10 +53,8 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
                     final messenger = ScaffoldMessenger.of(context);
 
                     try {
-                      await DbService().deletePromos(
-                        id: promo.id,
-                        isPromo: _isPromo,
-                      );
+                      await DbService.instance.deletePromo(_isPromo, promo.id);
+
 
                       if (!mounted) return;
 
@@ -123,7 +121,8 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
       body: Stack(
         children: [
           StreamBuilder(
-            stream: DbService().readPromos(_isPromo),
+            stream: DbService.instance
+                .readPromos(_isPromo),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
