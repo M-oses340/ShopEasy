@@ -6,7 +6,7 @@ import 'package:ecommerce_admin_app/views/categories_page.dart';
 import 'package:ecommerce_admin_app/views/coupons.dart';
 import 'package:ecommerce_admin_app/views/login.dart';
 import 'package:ecommerce_admin_app/views/modify_product.dart';
-import 'package:ecommerce_admin_app/views/modify_promo.dart';
+import 'package:ecommerce_admin_app/views/modify_promo.dart' as promo_view;
 import 'package:ecommerce_admin_app/views/orders_page.dart';
 import 'package:ecommerce_admin_app/views/products_page.dart';
 import 'package:ecommerce_admin_app/views/promo_banners_page.dart';
@@ -23,7 +23,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await dotenv.load(fileName: ".env");
-  runApp(const MyApp()); // ✅ use const
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
@@ -40,19 +40,19 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
         ),
         routes: {
-          "/": (context) => const CheckUser(), // ✅ const
-          "/login": (context) => const LoginPage(), // ✅ const
-          "/signup": (context) => const SingupPage(), // ✅ const
-          "/home": (context) => const AdminHome(), // ✅ const
-          "/category": (context) => const CategoriesPage(), // ✅ const
-          "/products": (context) => const ProductsPage(), // ✅ const
-          "/add_product": (context) => const ModifyProduct(), // ✅ const
-          "/view_product": (context) => const ViewProduct(), // ✅ const
-          "/promos": (context) => const PromoBannersPage(), // ✅ const
-          "/update_promo": (context) => const ModifyPromo(), // ✅ const
-          "/coupons": (context) => const CouponsPage(), // ✅ const
-          "/orders": (context) => const OrdersPage(), // ✅ const
-          "/view_order": (context) => const ViewOrder(), // ✅ const
+          "/": (context) => const CheckUser(),
+          "/login": (context) => const LoginPage(),
+          "/signup": (context) => const SingupPage(),
+          "/home": (context) => const AdminHome(),
+          "/category": (context) => const CategoriesPage(),
+          "/products": (context) => const ProductsPage(),
+          "/add_product": (context) => const ModifyProduct(),
+          "/update_promo": (context) => promo_view.ModifyPromo(),
+          "/view_product": (context) => const ViewProduct(),
+          "/promos": (context) => const PromoBannersPage(),
+          "/coupons": (context) => const CouponsPage(),
+          "/orders": (context) => const OrdersPage(),
+
         },
       ),
     );
@@ -86,10 +86,8 @@ class _CheckUserState extends State<CheckUser> {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold( // ✅ const
-      body: Center(
-        child: CircularProgressIndicator(), // ✅ const
-      ),
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

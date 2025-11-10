@@ -1,110 +1,108 @@
 import 'dart:io';
 import 'package:ecommerce_admin_app/controllers/cloudinary_service.dart';
 import 'package:ecommerce_admin_app/controllers/db_service.dart';
-import 'package:ecommerce_admin_app/models/products_model.dart';
+import 'package:ecommerce_admin_app/models/promo_banners_model.dart';
 import 'package:ecommerce_admin_app/providers/admin_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-class ModifyProduct extends StatefulWidget {
-  const ModifyProduct({super.key});
+class ModifyPromo extends StatefulWidget {
+  const ModifyPromo({super.key});
 
   @override
-  State<ModifyProduct> createState() => _ModifyProductState();
+  State<ModifyPromo> createState() => _ModifyPromoState();
 }
 
-class _ModifyProductState extends State<ModifyProduct> {
-  late String productId = "";
+class _ModifyPromoState extends State<ModifyPromo> {
   final formKey = GlobalKey<FormState>();
-  final nameController = TextEditingController();
-  final oldPriceController = TextEditingController();
-  final newPriceController = TextEditingController();
-  final quantityController = TextEditingController();
+
+  final titleController = TextEditingController();
   final categoryController = TextEditingController();
-  final descController = TextEditingController();
   final imageController = TextEditingController();
 
-  final ImagePicker picker = ImagePicker();
-  XFile? image;
+  String promoId = "";
+  bool _isPromo = true;
   bool _isLoading = false;
-  bool _isInitialized = false;
 
-  void setData(ProductsModel data) {
-    productId = data.id;
-    nameController.text = data.name;
-    oldPriceController.text = data.old_price.toString();
-    newPriceController.text = data.new_price.toString();
-    quantityController.text = data.maxQuantity.toString();
-    categoryController.text = data.category;
-    descController.text = data.description;
-    imageController.text = data.image;
-  }
+  final ImagePicker picker = ImagePicker();
+  XFile? pickedImage;
 
-  Future<void> _pickImageAndCloudinaryUpload() async {
-    final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked == null) return;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final args = ModalRoute.of(context)?.settings.arguments;
 
-    setState(() => _isLoading = true);
+    if (args != null && args is Map<String, dynamic>) {
+      _isPromo = args["promo"] ?? true;
 
-    final messenger = ScaffoldMessenger.of(context);
-
-    try {
-      final uploadedUrl = await uploadToCloudinary(picked);
-      if (uploadedUrl != null) {
-        setState(() => imageController.text = uploadedUrl);
-        messenger.showSnackBar(
-          const SnackBar(content: Text("Image uploaded successfully")),
-        );
-      } else {
-        messenger.showSnackBar(
-          const SnackBar(content: Text("Image upload failed")),
-        );
+      if (args["detail"] is PromoBannersModel) {
+        final data = args["detail"] as PromoBannersModel;
+        promoId = data.id;
+        titleController.text = data.title;
+        categoryController.text = data.category;
+        imageController.text = data.image;
       }
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text("Upload failed: $e")),
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _saveProduct() async {
-    if (!formKey.currentState!.validate()) return;
+  /// Pick image and upload to Cloudinary safely
+  Future<void> pickImage() async {
+    final XFile? img = await picker.pickImage(source: ImageSource.gallery);
+    if (img == null) return;
 
     setState(() => _isLoading = true);
 
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context); // capture before await
+    final url = await uploadToCloudinary(img);
+
+    if (!mounted) return;
+
+    setState(() {
+      pickedImage = img;
+      if (url != null) imageController.text = url;
+      _isLoading = false;
+    });
+
+    if (url != null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text("Image uploaded successfully")),
+      );
+    }
+  }
+
+  /// Save promo or banner safely
+  Future<void> savePromo() async {
+    if (!formKey.currentState!.validate()) return;
+
+    final messenger = ScaffoldMessenger.of(context); // capture before await
+    final navigator = Navigator.of(context); // capture before await
 
     final data = {
-      "name": nameController.text,
-      "old_price": int.parse(oldPriceController.text),
-      "new_price": int.parse(newPriceController.text),
-      "quantity": int.parse(quantityController.text),
+      "title": titleController.text,
       "category": categoryController.text,
-      "desc": descController.text,
       "image": imageController.text,
     };
 
+    setState(() => _isLoading = true);
+
     try {
-      if (productId.isNotEmpty) {
-        await DbService.instance.updateProduct(productId, data);
+      if (promoId.isEmpty) {
+        await DbService.instance.createPromo(_isPromo, data);
+        if (!mounted) return;
         messenger.showSnackBar(
-          const SnackBar(content: Text("Product Updated")),
+          SnackBar(content: Text("${_isPromo ? "Promo" : "Banner"} Added")),
         );
       } else {
-        await DbService.instance.createProduct(data);
+        await DbService.instance.updatePromo(_isPromo, promoId, data);
+        if (!mounted) return;
         messenger.showSnackBar(
-          const SnackBar(content: Text("Product Added")),
+          SnackBar(content: Text("${_isPromo ? "Promo" : "Banner"} Updated")),
         );
       }
+
+      if (!mounted) return;
       navigator.pop();
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text("Failed to save product: $e")),
-      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -112,152 +110,95 @@ class _ModifyProductState extends State<ModifyProduct> {
 
   @override
   Widget build(BuildContext context) {
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (!_isInitialized && args != null && args is ProductsModel) {
-      setData(args);
-      _isInitialized = true;
-    }
+    final titleText = promoId.isEmpty
+        ? (_isPromo ? "Add Promo" : "Add Banner")
+        : (_isPromo ? "Update Promo" : "Update Banner");
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(productId.isNotEmpty ? "Update Product" : "Add Product"),
-      ),
+      appBar: AppBar(title: Text(titleText)),
       body: Stack(
         children: [
           SingleChildScrollView(
-            padding: const EdgeInsets.all(8.0),
-            child: AbsorbPointer(
-              absorbing: _isLoading,
-              child: Form(
-                key: formKey,
-                child: Column(
-                  children: [
-                    TextFormField(
-                      controller: nameController,
-                      validator: (v) =>
-                      v!.isEmpty ? "This cant be empty." : null,
-                      decoration: InputDecoration(
-                        labelText: "Product Name",
-                        filled: true,
-                        fillColor: Colors.deepPurple.shade50,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: oldPriceController,
-                      validator: (v) =>
-                      v!.isEmpty ? "This cant be empty." : null,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: "Original Price",
-                        filled: true,
-                        fillColor: Colors.deepPurple.shade50,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: newPriceController,
-                      validator: (v) =>
-                      v!.isEmpty ? "This cant be empty." : null,
-                      keyboardType: TextInputType.number,
-                      decoration: InputDecoration(
-                        labelText: "Sell Price",
-                        filled: true,
-                        fillColor: Colors.deepPurple.shade50,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: quantityController,
-                      validator: (v) =>
-                      v!.isEmpty ? "This cant be empty." : null,
-                      decoration: InputDecoration(
-                        labelText: "Quantity Left",
-                        filled: true,
-                        fillColor: Colors.deepPurple.shade50,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: categoryController,
-                      readOnly: true,
-                      validator: (v) =>
-                      v!.isEmpty ? "This cant be empty." : null,
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text("Select Category"),
-                            content: Consumer<AdminProvider>(
-                              builder: (context, value, child) => Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: value.categories
-                                    .map(
-                                      (e) => TextButton(
-                                    onPressed: () {
-                                      categoryController.text = e["name"];
-                                      Navigator.pop(context);
-                                    },
-                                    child: Text(e["name"]),
-                                  ),
-                                )
-                                    .toList(),
-                              ),
+            padding: const EdgeInsets.all(8),
+            child: Form(
+              key: formKey,
+              child: Column(
+                children: [
+                  // Title
+                  TextFormField(
+                    controller: titleController,
+                    validator: (v) => v!.isEmpty ? "This cannot be empty" : null,
+                    decoration: const InputDecoration(labelText: "Title"),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Category
+                  TextFormField(
+                    controller: categoryController,
+                    readOnly: true,
+                    validator: (v) => v!.isEmpty ? "This cannot be empty" : null,
+                    decoration: const InputDecoration(labelText: "Category"),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text("Select Category"),
+                          content: Consumer<AdminProvider>(
+                            builder: (context, value, child) => Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: value.categories
+                                  .map(
+                                    (e) => TextButton(
+                                  onPressed: () {
+                                    categoryController.text = e["name"];
+                                    Navigator.pop(context);
+                                  },
+                                  child: Text(e["name"]),
+                                ),
+                              )
+                                  .toList(),
                             ),
                           ),
-                        );
-                      },
-                      decoration: InputDecoration(
-                        labelText: "Category",
-                        filled: true,
-                        fillColor: Colors.deepPurple.shade50,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: descController,
-                      validator: (v) =>
-                      v!.isEmpty ? "This cant be empty." : null,
-                      maxLines: 5,
-                      decoration: InputDecoration(
-                        labelText: "Description",
-                        filled: true,
-                        fillColor: Colors.deepPurple.shade50,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (imageController.text.isNotEmpty || image != null)
-                      Container(
-                        margin: const EdgeInsets.all(12),
-                        height: 150,
-                        width: double.infinity,
-                        color: Colors.deepPurple.shade50,
-                        child: image != null
-                            ? Image.file(File(image!.path), fit: BoxFit.contain)
-                            : Image.network(imageController.text,
-                            fit: BoxFit.contain),
-                      ),
-                    ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : _pickImageAndCloudinaryUpload,
-                      child: const Text("Pick Image"),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Image preview
+                  if (pickedImage != null || imageController.text.isNotEmpty)
+                    Container(
+                      height: 150,
                       width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _saveProduct,
-                        child: Text(
-                            productId.isNotEmpty ? "Update Product" : "Add Product"),
-                      ),
+                      color: Colors.deepPurple.shade50,
+                      child: pickedImage != null
+                          ? Image.file(File(pickedImage!.path), fit: BoxFit.contain)
+                          : Image.network(imageController.text, fit: BoxFit.contain),
                     ),
-                  ],
-                ),
+                  const SizedBox(height: 10),
+
+                  // Pick Image Button
+                  ElevatedButton(
+                    onPressed: _isLoading ? null : pickImage,
+                    child: const Text("Pick Image"),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Save Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : savePromo,
+                      child: Text(titleText),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
+
+          // Loading overlay
           if (_isLoading)
             Container(
               color: Colors.black26,
