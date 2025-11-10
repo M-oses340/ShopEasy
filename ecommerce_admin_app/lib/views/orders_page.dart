@@ -52,9 +52,9 @@ class _OrdersPageState extends State<OrdersPage> {
       height: 70,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withAlpha((0.15 * 255).round()), // replaced withOpacity
+        color: color.withAlpha((0.15 * 255).round()),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withAlpha((0.3 * 255).round())), // replaced withOpacity
+        border: Border.all(color: color.withAlpha((0.3 * 255).round())),
       ),
       child: Center(
         child: Column(
@@ -133,6 +133,27 @@ class _OrdersPageState extends State<OrdersPage> {
                     final order = orders[index];
                     return Card(
                       child: ListTile(
+                        title: Text("Order by ${order.name}"),
+                        subtitle: Text(
+                            "Ordered ${formatRelativeTime(order.created_at)}"),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            statusIcon(order.status),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              icon: const Icon(Icons.edit, color: Colors.blue),
+                              tooltip: "Modify Order",
+                              onPressed: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) =>
+                                      ModifyOrder(order: order),
+                                );
+                              },
+                            ),
+                          ],
+                        ),
                         onTap: () {
                           Navigator.push(
                             context,
@@ -140,16 +161,6 @@ class _OrdersPageState extends State<OrdersPage> {
                               builder: (_) => ViewOrder(order: order),
                             ),
                           );
-                        },
-                        title: Text("Order by ${order.name}"),
-                        subtitle: Text(
-                            "Ordered ${formatRelativeTime(order.created_at)}"),
-                        trailing: statusIcon(order.status),
-                        onLongPress: () {
-                          showDialog(
-                              context: context,
-                              builder: (context) =>
-                                  ModifyOrder(order: order));
                         },
                       ),
                     );
@@ -230,8 +241,7 @@ class ViewOrder extends StatelessWidget {
   }
 }
 
-
-
+// ======================= MODIFY ORDER DIALOG =======================
 class ModifyOrder extends StatefulWidget {
   final OrdersModel order;
   const ModifyOrder({super.key, required this.order});
