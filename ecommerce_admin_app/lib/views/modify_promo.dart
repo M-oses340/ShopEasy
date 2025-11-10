@@ -1,70 +1,58 @@
-
+import 'dart:io';
 import 'package:ecommerce_admin_app/controllers/cloudinary_service.dart';
 import 'package:ecommerce_admin_app/controllers/db_service.dart';
-import 'package:ecommerce_admin_app/models/promo_banners_model.dart';
+import 'package:ecommerce_admin_app/models/products_model.dart';
 import 'package:ecommerce_admin_app/providers/admin_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
-class ModifyPromo extends StatefulWidget {
-  const ModifyPromo({super.key});
+class ModifyProduct extends StatefulWidget {
+  const ModifyProduct({super.key});
 
   @override
-  State<ModifyPromo> createState() => _ModifyPromoState();
+  State<ModifyProduct> createState() => _ModifyProductState();
 }
 
-class _ModifyPromoState extends State<ModifyPromo> {
+class _ModifyProductState extends State<ModifyProduct> {
+  late String productId = "";
   final formKey = GlobalKey<FormState>();
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController categoryController = TextEditingController();
-  final TextEditingController imageController = TextEditingController();
+  final nameController = TextEditingController();
+  final oldPriceController = TextEditingController();
+  final newPriceController = TextEditingController();
+  final quantityController = TextEditingController();
+  final categoryController = TextEditingController();
+  final descController = TextEditingController();
+  final imageController = TextEditingController();
 
   final ImagePicker picker = ImagePicker();
   XFile? image;
-
-  bool _isInitialized = false;
-  bool _isPromo = true;
   bool _isLoading = false;
-  String productId = "";
+  bool _isInitialized = false;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_isInitialized) {
-      final args = ModalRoute.of(context)?.settings.arguments;
-      if (args != null && args is Map<String, dynamic>) {
-        if (args["detail"] is PromoBannersModel) {
-          setData(args["detail"] as PromoBannersModel);
-        }
-        _isPromo = args['promo'] ?? true;
-      }
-      _isInitialized = true;
-      setState(() {});
-    }
-  }
-
-  void setData(PromoBannersModel data) {
+  void setData(ProductsModel data) {
     productId = data.id;
-    titleController.text = data.title;
+    nameController.text = data.name;
+    oldPriceController.text = data.old_price.toString();
+    newPriceController.text = data.new_price.toString();
+    quantityController.text = data.maxQuantity.toString();
     categoryController.text = data.category;
+    descController.text = data.description;
     imageController.text = data.image;
   }
 
-  Future<void> _pickImageAndUpload() async {
+  Future<void> _pickImageAndCloudinaryUpload() async {
     final picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
     setState(() => _isLoading = true);
+
     final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
 
     try {
       final uploadedUrl = await uploadToCloudinary(picked);
-      if (!mounted) return;
-
       if (uploadedUrl != null) {
-        imageController.text = uploadedUrl;
+        setState(() => imageController.text = uploadedUrl);
         messenger.showSnackBar(
           const SnackBar(content: Text("Image uploaded successfully")),
         );
@@ -74,51 +62,49 @@ class _ModifyPromoState extends State<ModifyPromo> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        messenger.showSnackBar(
-          SnackBar(content: Text("Upload failed: $e")),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(content: Text("Upload failed: $e")),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _savePromo() async {
+  Future<void> _saveProduct() async {
     if (!formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
+
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
 
     final data = {
-      "title": titleController.text,
+      "name": nameController.text,
+      "old_price": int.parse(oldPriceController.text),
+      "new_price": int.parse(newPriceController.text),
+      "quantity": int.parse(quantityController.text),
       "category": categoryController.text,
+      "desc": descController.text,
       "image": imageController.text,
     };
 
     try {
       if (productId.isNotEmpty) {
-        await DbService()
-            .updatePromos(id: productId, data: data, isPromo: _isPromo);
-        if (!mounted) return;
-        messenger.showSnackBar(SnackBar(
-            content:
-            Text("${_isPromo ? "Promo" : "Banner"} updated successfully")));
+        await DbService.instance.updateProduct(productId, data);
+        messenger.showSnackBar(
+          const SnackBar(content: Text("Product Updated")),
+        );
       } else {
-        await DbService().createPromos(data: data, isPromo: _isPromo);
-        if (!mounted) return;
-        messenger.showSnackBar(SnackBar(
-            content:
-            Text("${_isPromo ? "Promo" : "Banner"} added successfully")));
+        await DbService.instance.createProduct(data);
+        messenger.showSnackBar(
+          const SnackBar(content: Text("Product Added")),
+        );
       }
-
-      if (mounted) navigator.pop();
+      navigator.pop();
     } catch (e) {
-      if (mounted) {
-        messenger.showSnackBar(SnackBar(
-            content: Text("Failed to save ${_isPromo ? "Promo" : "Banner"}")));
-      }
+      messenger.showSnackBar(
+        SnackBar(content: Text("Failed to save product: $e")),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -126,16 +112,16 @@ class _ModifyPromoState extends State<ModifyPromo> {
 
   @override
   Widget build(BuildContext context) {
-    final titleText = productId.isNotEmpty
-        ? _isPromo
-        ? "Update Promo"
-        : "Update Banner"
-        : _isPromo
-        ? "Add Promo"
-        : "Add Banner";
+    final args = ModalRoute.of(context)?.settings.arguments;
+    if (!_isInitialized && args != null && args is ProductsModel) {
+      setData(args);
+      _isInitialized = true;
+    }
 
     return Scaffold(
-      appBar: AppBar(title: Text(titleText)),
+      appBar: AppBar(
+        title: Text(productId.isNotEmpty ? "Update Product" : "Add Product"),
+      ),
       body: Stack(
         children: [
           SingleChildScrollView(
@@ -147,11 +133,46 @@ class _ModifyPromoState extends State<ModifyPromo> {
                 child: Column(
                   children: [
                     TextFormField(
-                      controller: titleController,
+                      controller: nameController,
                       validator: (v) =>
-                      v!.isEmpty ? "Title cannot be empty." : null,
+                      v!.isEmpty ? "This cant be empty." : null,
                       decoration: InputDecoration(
-                        labelText: "Title",
+                        labelText: "Product Name",
+                        filled: true,
+                        fillColor: Colors.deepPurple.shade50,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: oldPriceController,
+                      validator: (v) =>
+                      v!.isEmpty ? "This cant be empty." : null,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Original Price",
+                        filled: true,
+                        fillColor: Colors.deepPurple.shade50,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: newPriceController,
+                      validator: (v) =>
+                      v!.isEmpty ? "This cant be empty." : null,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        labelText: "Sell Price",
+                        filled: true,
+                        fillColor: Colors.deepPurple.shade50,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextFormField(
+                      controller: quantityController,
+                      validator: (v) =>
+                      v!.isEmpty ? "This cant be empty." : null,
+                      decoration: InputDecoration(
+                        labelText: "Quantity Left",
                         filled: true,
                         fillColor: Colors.deepPurple.shade50,
                       ),
@@ -159,36 +180,29 @@ class _ModifyPromoState extends State<ModifyPromo> {
                     const SizedBox(height: 10),
                     TextFormField(
                       controller: categoryController,
-                      validator: (v) =>
-                      v!.isEmpty ? "Category cannot be empty." : null,
                       readOnly: true,
-                      onTap: _isLoading
-                          ? null
-                          : () {
+                      validator: (v) =>
+                      v!.isEmpty ? "This cant be empty." : null,
+                      onTap: () {
                         showDialog(
                           context: context,
                           builder: (context) => AlertDialog(
                             title: const Text("Select Category"),
                             content: Consumer<AdminProvider>(
-                              builder: (context, value, child) =>
-                                  SingleChildScrollView(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                      children: value.categories
-                                          .map(
-                                            (e) => TextButton(
-                                          onPressed: () {
-                                            categoryController.text =
-                                            e["name"];
-                                            Navigator.pop(context);
-                                          },
-                                          child: Text(e["name"]),
-                                        ),
-                                      )
-                                          .toList(),
-                                    ),
+                              builder: (context, value, child) => Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: value.categories
+                                    .map(
+                                      (e) => TextButton(
+                                    onPressed: () {
+                                      categoryController.text = e["name"];
+                                      Navigator.pop(context);
+                                    },
+                                    child: Text(e["name"]),
                                   ),
+                                )
+                                    .toList(),
+                              ),
                             ),
                           ),
                         );
@@ -200,40 +214,43 @@ class _ModifyPromoState extends State<ModifyPromo> {
                       ),
                     ),
                     const SizedBox(height: 10),
-
-                    if (imageController.text.isNotEmpty)
+                    TextFormField(
+                      controller: descController,
+                      validator: (v) =>
+                      v!.isEmpty ? "This cant be empty." : null,
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        labelText: "Description",
+                        filled: true,
+                        fillColor: Colors.deepPurple.shade50,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (imageController.text.isNotEmpty || image != null)
                       Container(
                         margin: const EdgeInsets.all(12),
                         height: 150,
                         width: double.infinity,
                         color: Colors.deepPurple.shade50,
-                        child: Image.network(
-                          imageController.text,
-                          fit: BoxFit.contain,
-                        ),
+                        child: image != null
+                            ? Image.file(File(image!.path), fit: BoxFit.contain)
+                            : Image.network(imageController.text,
+                            fit: BoxFit.contain),
                       ),
                     ElevatedButton(
-                      onPressed: _isLoading ? null : _pickImageAndUpload,
+                      onPressed: _isLoading
+                          ? null
+                          : _pickImageAndCloudinaryUpload,
                       child: const Text("Pick Image"),
-                    ),
-                    const SizedBox(height: 10),
-                    TextFormField(
-                      controller: imageController,
-                      validator: (v) =>
-                      v!.isEmpty ? "Image URL cannot be empty." : null,
-                      decoration: InputDecoration(
-                        labelText: "Image Link",
-                        filled: true,
-                        fillColor: Colors.deepPurple.shade50,
-                      ),
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
                       width: double.infinity,
-                      height: 60,
+                      height: 50,
                       child: ElevatedButton(
-                        onPressed: _isLoading ? null : _savePromo,
-                        child: Text(titleText),
+                        onPressed: _isLoading ? null : _saveProduct,
+                        child: Text(
+                            productId.isNotEmpty ? "Update Product" : "Add Product"),
                       ),
                     ),
                   ],
