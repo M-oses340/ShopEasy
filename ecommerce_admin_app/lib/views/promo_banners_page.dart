@@ -29,84 +29,110 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
     }
   }
 
-  void _showActionDialog(PromoBannersModel promo) {
-    showDialog(
+  void _showAnimatedDialog(Widget dialog) {
+    showGeneralDialog(
       context: context,
-      builder: (context) {
-        final theme = Theme.of(context);
-        return AlertDialog(
-          backgroundColor: theme.colorScheme.surface,
-          title: Text("Choose Action", style: theme.textTheme.titleMedium),
-          content: Text(
-            "Deleting cannot be undone.",
-            style: theme.textTheme.bodyMedium,
+      barrierLabel: "Dialog",
+      barrierDismissible: true,
+      barrierColor: Colors.black45,
+      transitionDuration: const Duration(milliseconds: 250),
+      pageBuilder: (context, anim1, anim2) => Center(child: dialog),
+      transitionBuilder: (context, anim1, anim2, child) {
+        return FadeTransition(
+          opacity: anim1,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.8, end: 1.0).animate(
+              CurvedAnimation(parent: anim1, curve: Curves.easeOutBack),
+            ),
+            child: child,
           ),
-          actions: [
-            TextButton(
-              onPressed: _isLoading
-                  ? null
-                  : () {
-                Navigator.pop(context);
-                showDialog(
-                  context: context,
-                  builder: (context) => AdditionalConfirm(
-                    contentText:
-                    "Are you sure you want to delete this item?",
-                    onYes: () async {
-                      setState(() => _isLoading = true);
-                      final messenger = ScaffoldMessenger.of(context);
-                      final navigator = Navigator.of(context);
-
-                      try {
-                        await DbService.instance
-                            .deletePromo(_isPromo, promo.id);
-                        if (!mounted) return;
-
-                        setState(() => _isLoading = false);
-                        navigator.pop();
-
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                "${_isPromo ? "Promo" : "Banner"} deleted successfully"),
-                            backgroundColor: theme.colorScheme.error,
-                          ),
-                        );
-                      } catch (e) {
-                        if (mounted) {
-                          setState(() => _isLoading = false);
-                          messenger.showSnackBar(
-                            SnackBar(content: Text("Error: $e")),
-                          );
-                        }
-                      }
-                    },
-                    onNo: () => Navigator.pop(context),
-                  ),
-                );
-              },
-              child: Text("Delete ${_isPromo ? "Promo" : "Banner"}"),
-            ),
-            TextButton(
-              onPressed: _isLoading
-                  ? null
-                  : () {
-                Navigator.pop(context);
-                Navigator.pushNamed(
-                  context,
-                  "/update_promo",
-                  arguments: {
-                    "promo": _isPromo,
-                    "detail": promo,
-                  },
-                );
-              },
-              child: Text("Update ${_isPromo ? "Promo" : "Banner"}"),
-            ),
-          ],
         );
       },
     );
+  }
+
+  void _showActionDialog(PromoBannersModel promo) {
+    final theme = Theme.of(context);
+    _showAnimatedDialog(AlertDialog(
+      backgroundColor: theme.colorScheme.surface,
+      title: Text(
+        "Choose Action",
+        style: theme.textTheme.titleMedium,
+      ),
+      content: Text(
+        "Deleting cannot be undone.",
+        style: theme.textTheme.bodyMedium,
+      ),
+      actions: [
+        // DELETE BUTTON
+        TextButton(
+          onPressed: _isLoading
+              ? null
+              : () {
+            Navigator.pop(context);
+            _showAnimatedDialog(AdditionalConfirm(
+              contentText: "Are you sure you want to delete this item?",
+              onYes: () async {
+                setState(() => _isLoading = true);
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+
+                try {
+                  await DbService.instance.deletePromo(_isPromo, promo.id);
+                  if (!mounted) return;
+
+                  setState(() => _isLoading = false);
+                  navigator.pop();
+
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "${_isPromo ? "Promo" : "Banner"} deleted successfully",
+                      ),
+                      backgroundColor: theme.colorScheme.error,
+                    ),
+                  );
+                } catch (e) {
+                  if (mounted) {
+                    setState(() => _isLoading = false);
+                    messenger.showSnackBar(
+                      SnackBar(content: Text("Error: $e")),
+                    );
+                  }
+                }
+              },
+              onNo: () => Navigator.pop(context),
+            ));
+          },
+          child: Text(
+            "Delete ${_isPromo ? "Promo" : "Banner"}",
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ),
+
+        // UPDATE BUTTON
+        TextButton(
+          onPressed: _isLoading
+              ? null
+              : () {
+            Navigator.pop(context);
+            Navigator.pushNamed(
+              context,
+              "/update_promo",
+              arguments: {"promo": _isPromo, "detail": promo},
+            );
+          },
+          child: Text(
+            "Update ${_isPromo ? "Promo" : "Banner"}",
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.primary,
+            ),
+          ),
+        ),
+      ],
+    ));
   }
 
   @override
@@ -132,9 +158,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
-                  child: CircularProgressIndicator(
-                    color: theme.colorScheme.primary,
-                  ),
+                  child: CircularProgressIndicator(color: theme.colorScheme.primary),
                 );
               }
 
@@ -160,7 +184,6 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
 
               return LayoutBuilder(
                 builder: (context, constraints) {
-                  // Calculate number of columns based on width
                   int crossAxisCount = 1;
                   double width = constraints.maxWidth;
 
@@ -178,7 +201,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
                       crossAxisCount: crossAxisCount,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 12,
-                      childAspectRatio: 3.5, // Horizontal cards
+                      childAspectRatio: 3.5,
                     ),
                     itemCount: promos.length,
                     itemBuilder: (context, index) {
@@ -208,9 +231,10 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
                                   height: 60,
                                   width: 60,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) =>
-                                      Icon(Icons.broken_image,
-                                          color: theme.colorScheme.onSurface),
+                                  errorBuilder: (_, __, ___) => Icon(
+                                    Icons.broken_image,
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -222,8 +246,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
                                     Text(
                                       promo.title,
                                       style: theme.textTheme.bodyMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                          fontWeight: FontWeight.bold),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -244,10 +267,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
                                   Navigator.pushNamed(
                                     context,
                                     "/update_promo",
-                                    arguments: {
-                                      "promo": _isPromo,
-                                      "detail": promo,
-                                    },
+                                    arguments: {"promo": _isPromo, "detail": promo},
                                   );
                                 },
                               ),
@@ -274,13 +294,10 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
         onPressed: _isLoading
             ? null
             : () {
-          Navigator.pushNamed(
-            context,
-            "/update_promo",
-            arguments: {"promo": _isPromo},
-          );
+          Navigator.pushNamed(context, "/update_promo", arguments: {"promo": _isPromo});
         },
         backgroundColor: theme.colorScheme.primary,
+        foregroundColor: theme.colorScheme.onPrimary,
         child: const Icon(Icons.add),
       ),
     );
