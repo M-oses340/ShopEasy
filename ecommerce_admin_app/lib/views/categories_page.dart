@@ -19,6 +19,7 @@ class CategoriesPage extends StatefulWidget {
 class _CategoriesPageState extends State<CategoriesPage> {
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text("Categories")),
       body: Consumer<AdminProvider>(
@@ -26,7 +27,12 @@ class _CategoriesPageState extends State<CategoriesPage> {
           final categories = CategoriesModel.fromJsonList(value.categories);
 
           if (categories.isEmpty) {
-            return const Center(child: Text("No Categories Found"));
+            return Center(
+              child: Text(
+                "No Categories Found",
+                style: TextStyle(color: theme.colorScheme.onSurface),
+              ),
+            );
           }
 
           return ListView.builder(
@@ -38,25 +44,29 @@ class _CategoriesPageState extends State<CategoriesPage> {
                   : category.image;
 
               return ListTile(
-                leading: SizedBox(
-                  height: 50,
-                  width: 50,
-                  child: Image.network(imageUrl, fit: BoxFit.cover),
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: SizedBox(
+                    height: 50,
+                    width: 50,
+                    child: Image.network(imageUrl, fit: BoxFit.cover),
+                  ),
                 ),
-                onTap: () {
-                  _showCategoryActions(context, category);
-                },
+                onTap: () => _showCategoryActions(context, category),
                 title: Text(
                   category.name,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: theme.colorScheme.onSurface),
                 ),
-                subtitle: Text("Priority: ${category.priority}"),
+                subtitle: Text(
+                  "Priority: ${category.priority}",
+                  style: TextStyle(color: theme.colorScheme.surfaceContainerHighest
+                  ),
+                ),
                 trailing: IconButton(
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () {
-                    _showModifyCategoryDialog(context, category);
-                  },
+                  icon: Icon(Icons.edit_outlined, color: theme.colorScheme.primary),
+                  onPressed: () => _showModifyCategoryDialog(context, category),
                 ),
               );
             },
@@ -64,13 +74,9 @@ class _CategoriesPageState extends State<CategoriesPage> {
         },
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          _showModifyCategoryDialog(
-            context,
-            null,
-          );
-        },
-        child: const Icon(Icons.add),
+        onPressed: () => _showModifyCategoryDialog(context, null),
+        child: Icon(Icons.add, color: theme.colorScheme.onPrimary),
+        backgroundColor: theme.colorScheme.primary,
       ),
     );
   }
@@ -85,7 +91,6 @@ class _CategoriesPageState extends State<CategoriesPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // Close main dialog
-
               final navigator = Navigator.of(context);
               final messenger = ScaffoldMessenger.of(context);
 
@@ -95,14 +100,10 @@ class _CategoriesPageState extends State<CategoriesPage> {
                   contentText: "Are you sure you want to delete this?",
                   onYes: () async {
                     await DbService.instance.deleteCategory(category.id);
-
                     if (!mounted) return;
-
-                    navigator.pop(); // Close confirmation dialog
+                    navigator.pop(); // Close confirmation
                     messenger.showSnackBar(
-                      const SnackBar(
-                        content: Text("Category deleted successfully."),
-                      ),
+                      const SnackBar(content: Text("Category deleted successfully.")),
                     );
                   },
                   onNo: () => Navigator.pop(context),
@@ -186,9 +187,7 @@ class _ModifyCategoryState extends State<ModifyCategory> {
     if (picked != null) {
       final uploadedUrl = await uploadToCloudinary(picked);
       if (uploadedUrl != null && mounted) {
-        setState(() {
-          imageController.text = uploadedUrl;
-        });
+        setState(() => imageController.text = uploadedUrl);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Image uploaded successfully")),
         );
@@ -198,6 +197,7 @@ class _ModifyCategoryState extends State<ModifyCategory> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return AlertDialog(
       title: Text(widget.isUpdating ? "Update Category" : "Add Category"),
       content: SingleChildScrollView(
@@ -214,8 +214,9 @@ class _ModifyCategoryState extends State<ModifyCategory> {
                 validator: (v) => v!.isEmpty ? "This can't be empty." : null,
                 decoration: InputDecoration(
                   hintText: "Category Name",
-                  label: const Text("Category Name"),
-                  fillColor: Colors.deepPurple.shade50,
+                  labelText: "Category Name",
+                  fillColor: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 40),
                   filled: true,
                 ),
               ),
@@ -228,8 +229,9 @@ class _ModifyCategoryState extends State<ModifyCategory> {
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(
                   hintText: "Priority",
-                  label: const Text("Priority"),
-                  fillColor: Colors.deepPurple.shade50,
+                  labelText: "Priority",
+                  fillColor: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 40),
                   filled: true,
                 ),
               ),
@@ -239,7 +241,8 @@ class _ModifyCategoryState extends State<ModifyCategory> {
                   margin: const EdgeInsets.all(20),
                   height: 200,
                   width: double.infinity,
-                  color: Colors.deepPurple.shade50,
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 40),
                   child: Image.file(File(image!.path), fit: BoxFit.contain),
                 )
               else if (imageController.text.isNotEmpty)
@@ -247,7 +250,8 @@ class _ModifyCategoryState extends State<ModifyCategory> {
                   margin: const EdgeInsets.all(20),
                   height: 100,
                   width: double.infinity,
-                  color: Colors.deepPurple.shade50,
+                  color: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 40),
                   child: Image.network(imageController.text, fit: BoxFit.contain),
                 ),
               ElevatedButton(
@@ -260,8 +264,9 @@ class _ModifyCategoryState extends State<ModifyCategory> {
                 validator: (v) => v!.isEmpty ? "This can't be empty." : null,
                 decoration: InputDecoration(
                   hintText: "Image Link",
-                  label: const Text("Image Link"),
-                  fillColor: Colors.deepPurple.shade50,
+                  labelText: "Image Link",
+                  fillColor: theme.colorScheme.surfaceContainerHighest
+                      .withValues(alpha: 40),
                   filled: true,
                 ),
               ),
@@ -274,36 +279,25 @@ class _ModifyCategoryState extends State<ModifyCategory> {
         TextButton(
           onPressed: () async {
             if (!formKey.currentState!.validate()) return;
-
             final navigator = Navigator.of(context);
             final messenger = ScaffoldMessenger.of(context);
 
+            final data = {
+              "name": categoryController.text.toLowerCase(),
+              "image": imageController.text,
+              "priority": int.parse(priorityController.text),
+            };
+
             if (widget.isUpdating) {
-              await DbService.instance.updateCategory(widget.categoryId, {
-                "name": categoryController.text.toLowerCase(),
-                "image": imageController.text,
-                "priority": int.parse(priorityController.text),
-              });
-
+              await DbService.instance.updateCategory(widget.categoryId, data);
               if (!mounted) return;
-
               navigator.pop();
-              messenger.showSnackBar(
-                const SnackBar(content: Text("Category Updated")),
-              );
+              messenger.showSnackBar(const SnackBar(content: Text("Category Updated")));
             } else {
-              await DbService.instance.createCategory({
-                "name": categoryController.text.toLowerCase(),
-                "image": imageController.text,
-                "priority": int.parse(priorityController.text),
-              });
-
+              await DbService.instance.createCategory(data);
               if (!mounted) return;
-
               navigator.pop();
-              messenger.showSnackBar(
-                const SnackBar(content: Text("Category Added")),
-              );
+              messenger.showSnackBar(const SnackBar(content: Text("Category Added")));
             }
           },
           child: Text(widget.isUpdating ? "Update" : "Add"),
