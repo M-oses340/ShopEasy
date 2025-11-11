@@ -177,32 +177,65 @@ class _AdminHomeState extends State<AdminHome> {
     );
   }
 
-  // Helper: builds responsive admin buttons
+  // Helper: builds responsive admin buttons with hover effect
   Widget _buildHomeButton(BuildContext context, String name, String route,
       {Object? arguments}) {
-    return InkWell(
+    return _HoverableButton(
+      name: name,
       onTap: () => Navigator.pushNamed(context, route, arguments: arguments),
-      borderRadius: BorderRadius.circular(12),
-      splashColor: Colors.deepPurple.withValues(alpha: 0.2),
-      child: Container(
+    );
+  }
+}
+
+/// Custom hoverable button widget
+class _HoverableButton extends StatefulWidget {
+  final String name;
+  final VoidCallback onTap;
+  const _HoverableButton({required this.name, required this.onTap});
+
+  @override
+  State<_HoverableButton> createState() => _HoverableButtonState();
+}
+
+class _HoverableButtonState extends State<_HoverableButton> {
+  bool _isHovering = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovering = true),
+      onExit: (_) => setState(() => _isHovering = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
+          color: theme.colorScheme.primaryContainer,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 4,
+              color: Colors.black.withValues(alpha: _isHovering ? 0.15 : 0.1),
+              blurRadius: _isHovering ? 8 : 4,
               offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Text(
-          name,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.onPrimaryContainer,
+        transform: Matrix4.identity()
+          ..translateByDouble(0.0, _isHovering ? -4.0 : 0.0, 0.0, 1.0), // ✅ fixed
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          splashColor: Colors.deepPurple.withValues(alpha: 0.2),
+          onTap: widget.onTap,
+          child: Center(
+            child: Text(
+              widget.name,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onPrimaryContainer,
+              ),
+            ),
           ),
         ),
       ),
