@@ -1,4 +1,4 @@
-import 'dart:ui';
+
 import 'package:ecommerce_admin_app/containers/additional_confirm.dart';
 import 'package:ecommerce_admin_app/controllers/db_service.dart';
 import 'package:ecommerce_admin_app/models/promo_banners_model.dart';
@@ -46,7 +46,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
               onPressed: _isLoading
                   ? null
                   : () {
-                Navigator.pop(context); // Close main dialog
+                Navigator.pop(context);
                 showDialog(
                   context: context,
                   builder: (context) => AdditionalConfirm(
@@ -63,7 +63,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
                         if (!mounted) return;
 
                         setState(() => _isLoading = false);
-                        navigator.pop(); // Close confirmation dialog
+                        navigator.pop();
 
                         messenger.showSnackBar(
                           SnackBar(
@@ -116,9 +116,7 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
     if (!_isInitialized) {
       return Scaffold(
         body: Center(
-          child: CircularProgressIndicator(
-            color: theme.colorScheme.primary,
-          ),
+          child: CircularProgressIndicator(color: theme.colorScheme.primary),
         ),
       );
     }
@@ -160,80 +158,104 @@ class _PromoBannersPageState extends State<PromoBannersPage> {
 
               final promos = PromoBannersModel.fromJsonList(snapshot.data!.docs);
 
-              return ListView.separated(
-                padding: const EdgeInsets.all(12),
-                itemCount: promos.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, index) {
-                  final promo = promos[index];
-                  return InkWell(
-                    onTap: () => _showActionDialog(promo),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(8),
-                        boxShadow: [
-                          BoxShadow(
-                            color: theme.shadowColor.withValues(alpha: 25),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(6),
-                            child: Image.network(
-                              promo.image,
-                              height: 60,
-                              width: 60,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) =>
-                                  Icon(Icons.broken_image, color: theme.colorScheme.onSurface),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  promo.title,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  promo.category,
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.edit_outlined, color: theme.colorScheme.primary),
-                            onPressed: _isLoading
-                                ? null
-                                : () {
-                              Navigator.pushNamed(
-                                context,
-                                "/update_promo",
-                                arguments: {
-                                  "promo": _isPromo,
-                                  "detail": promo,
-                                },
-                              );
-                            },
-                          ),
-                        ],
-                      ),
+              return LayoutBuilder(
+                builder: (context, constraints) {
+                  // Calculate number of columns based on width
+                  int crossAxisCount = 1;
+                  double width = constraints.maxWidth;
+
+                  if (width > 1200) {
+                    crossAxisCount = 4;
+                  } else if (width > 900) {
+                    crossAxisCount = 3;
+                  } else if (width > 600) {
+                    crossAxisCount = 2;
+                  }
+
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 3.5, // Horizontal cards
                     ),
+                    itemCount: promos.length,
+                    itemBuilder: (context, index) {
+                      final promo = promos[index];
+                      return InkWell(
+                        onTap: () => _showActionDialog(promo),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: theme.shadowColor.withValues(alpha: 25),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(6),
+                                child: Image.network(
+                                  promo.image,
+                                  height: 60,
+                                  width: 60,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) =>
+                                      Icon(Icons.broken_image,
+                                          color: theme.colorScheme.onSurface),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      promo.title,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      promo.category,
+                                      style: theme.textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.edit_outlined,
+                                    color: theme.colorScheme.primary),
+                                onPressed: _isLoading
+                                    ? null
+                                    : () {
+                                  Navigator.pushNamed(
+                                    context,
+                                    "/update_promo",
+                                    arguments: {
+                                      "promo": _isPromo,
+                                      "detail": promo,
+                                    },
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   );
                 },
               );
