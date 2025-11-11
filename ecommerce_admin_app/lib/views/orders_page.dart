@@ -49,31 +49,51 @@ class _OrdersPageState extends State<OrdersPage> {
     );
   }
 
-  Widget summaryBox(String label, int value, Color color) {
+  Widget summaryBox(String label, int value, Color baseColor, BuildContext context) {
+    final theme = Theme.of(context);
+    // Decide background and text color based on theme brightness
+    final isDark = theme.brightness == Brightness.dark;
+    final bgColor = isDark
+        ? baseColor.withValues(alpha: (0.25 * 255)) // darker background in dark mode
+        : baseColor.withValues(alpha: (0.15 * 255)); // lighter in light mode
+    final textColor = isDark ? Colors.white : baseColor;
+
     return Container(
       height: 70,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: bgColor,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: baseColor.withValues(alpha: (0.3 * 255))),
       ),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 14, fontWeight: FontWeight.w500, color: color)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text("$value",
-                style: TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+            Text(
+              "$value",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -109,13 +129,8 @@ class _OrdersPageState extends State<OrdersPage> {
           return Column(
             children: [
               // Dashboard Summary
-              Container(
-                padding: const EdgeInsets.all(16),
-                margin: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                ),
+              Padding(
+                padding: const EdgeInsets.all(12),
                 child: GridView.count(
                   crossAxisCount: 2,
                   shrinkWrap: true,
@@ -124,11 +139,12 @@ class _OrdersPageState extends State<OrdersPage> {
                   childAspectRatio: 2.2,
                   physics: const NeverScrollableScrollPhysics(),
                   children: [
-                    summaryBox("Cancelled", cancelledCount, Colors.red),
-                    summaryBox("On the Way", onTheWayCount, Colors.orange),
-                    summaryBox("Paid", paidCount, Colors.green),
-                    summaryBox("Delivered", deliveredCount, Colors.blue),
+                    summaryBox("Cancelled", cancelledCount, Colors.red, context),
+                    summaryBox("On the Way", onTheWayCount, Colors.orange, context),
+                    summaryBox("Paid", paidCount, Colors.green, context),
+                    summaryBox("Delivered", deliveredCount, Colors.blue, context),
                   ],
+
                 ),
               ),
 
@@ -238,8 +254,8 @@ class ViewOrder extends StatelessWidget {
                                   color: theme.colorScheme.onSurface))),
                       Text(
                           "${item.quantity} x KSh${item.single_price} = KSh${item.total_price}",
-                          style: TextStyle(
-                              color: theme.colorScheme.onSurface)),
+                          style:
+                          TextStyle(color: theme.colorScheme.onSurface)),
                     ],
                   ),
                 ))
