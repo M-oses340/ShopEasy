@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:ecommerce_admin_app/containers/dashboard_text.dart';
 import 'package:ecommerce_admin_app/containers/home_button.dart';
 import 'package:ecommerce_admin_app/controllers/auth_service.dart';
@@ -153,14 +154,19 @@ class _AdminHomeState extends State<AdminHome>
             ),
           ),
 
-          // Smooth fade overlay when logging out
+          // Logout overlay with blur effect
           if (_isLoggingOut)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              color: Colors.black.withValues(alpha: 0.5),
-              child: const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.white,
+              color: Colors.black.withValues(alpha: 0), // transparent base
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                child: Container(
+                  color: Colors.black.withValues(alpha: 0.5), // dimmed overlay
+                  alignment: Alignment.center,
+                  child: const CircularProgressIndicator(
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),
