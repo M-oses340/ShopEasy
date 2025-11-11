@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:ecommerce_admin_app/controllers/auth_service.dart';
 import 'package:ecommerce_admin_app/firebase_options.dart';
 import 'package:ecommerce_admin_app/providers/admin_provider.dart';
@@ -74,45 +75,55 @@ class MyApp extends StatelessWidget {
                 children: [
                   child!,
                   if (!isOnline)
-                    Container(
-                      width: double.infinity,
-                      height: double.infinity,
-                      color: Colors.black.withValues(alpha: 0.85), // ✅ Updated
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.wifi_off, size: 80, color: Colors.white),
-                          const SizedBox(height: 20),
-                          const Text(
-                            "No Internet Connection",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      color: Colors.black.withValues(alpha: 0), // transparent base
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                        child: Container(
+                          color: Colors.black.withValues(alpha: 0.5),
+                          width: double.infinity,
+                          height: double.infinity,
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.wifi_off,
+                                  size: 80, color: Colors.white),
+                              const SizedBox(height: 20),
+                              const Text(
+                                "No Internet Connection",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                "Please check your network and try again.",
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 30),
+                              ElevatedButton(
+                                onPressed: () {
+                                  context
+                                      .read<ConnectivityProvider>()
+                                      .retry();
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.black,
+                                ),
+                                child: const Text("Retry"),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 10),
-                          const Text(
-                            "Please check your network and try again.",
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 30),
-                          ElevatedButton(
-                            onPressed: () {
-                              context.read<ConnectivityProvider>().retry();
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.black,
-                            ),
-                            child: const Text("Retry"),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
                 ],
