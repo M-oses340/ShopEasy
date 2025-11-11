@@ -1,6 +1,5 @@
 import 'dart:ui';
 import 'package:ecommerce_admin_app/containers/dashboard_text.dart';
-import 'package:ecommerce_admin_app/containers/home_button.dart';
 import 'package:ecommerce_admin_app/controllers/auth_service.dart';
 import 'package:ecommerce_admin_app/providers/admin_provider.dart';
 import 'package:flutter/material.dart';
@@ -63,9 +62,17 @@ class _AdminHomeState extends State<AdminHome> {
       appBar: AppBar(
         title: const Text("Admin Dashboard"),
         actions: [
-          IconButton(
+          _isLoggingOut
+              ? const Padding(
+            padding: EdgeInsets.all(12),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          )
+              : IconButton(
             icon: const Icon(Icons.logout),
-            onPressed: _isLoggingOut ? null : () => _handleLogout(context),
+            onPressed: () => _handleLogout(context),
           ),
         ],
       ),
@@ -75,6 +82,7 @@ class _AdminHomeState extends State<AdminHome> {
             padding: const EdgeInsets.only(bottom: 30),
             child: Column(
               children: [
+                // Dashboard metrics
                 Container(
                   height: 260,
                   padding: const EdgeInsets.all(12),
@@ -114,39 +122,35 @@ class _AdminHomeState extends State<AdminHome> {
                   ),
                 ),
 
-                // Admin action buttons
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    HomeButton(
-                      onTap: () => Navigator.pushNamed(context, "/orders"),
-                      name: "Orders",
-                    ),
-                    HomeButton(
-                      onTap: () => Navigator.pushNamed(context, "/products"),
-                      name: "Products",
-                    ),
-                    HomeButton(
-                      onTap: () => Navigator.pushNamed(context, "/promos",
-                          arguments: {"promo": true}),
-                      name: "Promos",
-                    ),
-                    HomeButton(
-                      onTap: () => Navigator.pushNamed(context, "/promos",
-                          arguments: {"promo": false}),
-                      name: "Banners",
-                    ),
-                    HomeButton(
-                      onTap: () => Navigator.pushNamed(context, "/category"),
-                      name: "Categories",
-                    ),
-                    HomeButton(
-                      onTap: () => Navigator.pushNamed(context, "/coupons"),
-                      name: "Coupons",
-                    ),
-                  ],
+                // Responsive admin action buttons
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      int crossAxisCount = 2; // phones
+                      if (constraints.maxWidth > 600) crossAxisCount = 3; // tablets
+                      if (constraints.maxWidth > 900) crossAxisCount = 4; // large screens
+
+                      return GridView.count(
+                        crossAxisCount: crossAxisCount,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: 1.5,
+                        children: [
+                          _buildHomeButton(context, "Orders", "/orders"),
+                          _buildHomeButton(context, "Products", "/products"),
+                          _buildHomeButton(context, "Promos", "/promos",
+                              arguments: {"promo": true}),
+                          _buildHomeButton(context, "Banners", "/promos",
+                              arguments: {"promo": false}),
+                          _buildHomeButton(context, "Categories", "/category"),
+                          _buildHomeButton(context, "Coupons", "/coupons"),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
@@ -156,11 +160,11 @@ class _AdminHomeState extends State<AdminHome> {
           if (_isLoggingOut)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              color: Colors.black.withValues(alpha: 0), // transparent base
+              color: Colors.black.withValues(alpha: 0),
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
                 child: Container(
-                  color: Colors.black.withValues(alpha: 0.5), // dimmed overlay
+                  color: Colors.black.withValues(alpha: 0.5),
                   alignment: Alignment.center,
                   child: const CircularProgressIndicator(
                     color: Colors.white,
@@ -169,6 +173,38 @@ class _AdminHomeState extends State<AdminHome> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // Helper: builds responsive admin buttons
+  Widget _buildHomeButton(BuildContext context, String name, String route,
+      {Object? arguments}) {
+    return InkWell(
+      onTap: () => Navigator.pushNamed(context, route, arguments: arguments),
+      borderRadius: BorderRadius.circular(12),
+      splashColor: Colors.deepPurple.withValues(alpha: 0.2),
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Text(
+          name,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).colorScheme.onPrimaryContainer,
+          ),
+        ),
       ),
     );
   }
