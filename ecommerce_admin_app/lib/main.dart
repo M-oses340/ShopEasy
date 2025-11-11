@@ -1,6 +1,7 @@
 import 'package:ecommerce_admin_app/controllers/auth_service.dart';
 import 'package:ecommerce_admin_app/firebase_options.dart';
 import 'package:ecommerce_admin_app/providers/admin_provider.dart';
+import 'package:ecommerce_admin_app/providers/connectivity_provider.dart';
 import 'package:ecommerce_admin_app/views/admin_home.dart';
 import 'package:ecommerce_admin_app/views/categories_page.dart';
 import 'package:ecommerce_admin_app/views/coupons.dart';
@@ -24,6 +25,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await dotenv.load(fileName: ".env");
+
   runApp(const MyApp());
 }
 
@@ -32,53 +34,106 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => AdminProvider(),
-      builder: (context, child) => MaterialApp(
-        title: 'Ecommerce Admin App',
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
+      ],
+      child: Consumer<ConnectivityProvider>(
+        builder: (context, connectivity, child) {
+          return MaterialApp(
+            title: 'Ecommerce Admin App',
+            themeMode: ThemeMode.system,
 
-        // Automatically adapt to system theme
-        themeMode: ThemeMode.system,
+            theme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.deepPurple,
+                brightness: Brightness.light,
+              ),
+              useMaterial3: true,
+              appBarTheme: const AppBarTheme(
+                systemOverlayStyle: SystemUiOverlayStyle.dark,
+              ),
+            ),
 
-        // Light theme
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple,
-            brightness: Brightness.light, // set brightness here
-          ),
-          useMaterial3: true,
-          scaffoldBackgroundColor: Colors.white,
-          appBarTheme: const AppBarTheme(
-            systemOverlayStyle: SystemUiOverlayStyle.dark,
-          ),
-        ),
+            darkTheme: ThemeData(
+              colorScheme: ColorScheme.fromSeed(
+                seedColor: Colors.deepPurple,
+                brightness: Brightness.dark,
+              ),
+              useMaterial3: true,
+              appBarTheme: const AppBarTheme(
+                systemOverlayStyle: SystemUiOverlayStyle.light,
+              ),
+            ),
 
-        // Dark theme
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: Colors.deepPurple,
-            brightness: Brightness.dark, // set brightness here
-          ),
-          useMaterial3: true,
-          scaffoldBackgroundColor: Colors.black,
-          appBarTheme: const AppBarTheme(
-            systemOverlayStyle: SystemUiOverlayStyle.light,
-          ),
-        ),
+            builder: (context, child) {
+              final isOnline = connectivity.isOnline;
 
-        routes: {
-          "/": (context) => const CheckUser(),
-          "/login": (context) => const LoginPage(),
-          "/signup": (context) => const SingupPage(),
-          "/home": (context) => const AdminHome(),
-          "/category": (context) => const CategoriesPage(),
-          "/products": (context) => const ProductsPage(),
-          "/add_product": (context) => const ModifyProduct(),
-          "/update_promo": (context) => promo_view.ModifyPromo(),
-          "/view_product": (context) => const ViewProduct(),
-          "/promos": (context) => const PromoBannersPage(),
-          "/coupons": (context) => const CouponsPage(),
-          "/orders": (context) => const OrdersPage(),
+              return Stack(
+                children: [
+                  child!,
+                  if (!isOnline)
+                    Container(
+                      width: double.infinity,
+                      height: double.infinity,
+                      color: Colors.black.withValues(alpha: 0.85), // ✅ Updated
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.wifi_off, size: 80, color: Colors.white),
+                          const SizedBox(height: 20),
+                          const Text(
+                            "No Internet Connection",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            "Please check your network and try again.",
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 30),
+                          ElevatedButton(
+                            onPressed: () {
+                              context.read<ConnectivityProvider>().retry();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                            ),
+                            child: const Text("Retry"),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              );
+            },
+
+            routes: {
+              "/": (context) => const CheckUser(),
+              "/login": (context) => const LoginPage(),
+              "/signup": (context) => const SingupPage(),
+              "/home": (context) => const AdminHome(),
+              "/category": (context) => const CategoriesPage(),
+              "/products": (context) => const ProductsPage(),
+              "/add_product": (context) => const ModifyProduct(),
+              "/update_promo": (context) => const promo_view.ModifyPromo(),
+              "/view_product": (context) => const ViewProduct(),
+              "/promos": (context) => const PromoBannersPage(),
+              "/coupons": (context) => const CouponsPage(),
+              "/orders": (context) => const OrdersPage(),
+            },
+          );
         },
       ),
     );
@@ -103,11 +158,7 @@ class _CheckUserState extends State<CheckUser> {
     final isLoggedIn = await AuthService().isLoggedIn();
     if (!mounted) return;
 
-    if (isLoggedIn) {
-      Navigator.pushReplacementNamed(context, "/home");
-    } else {
-      Navigator.pushReplacementNamed(context, "/login");
-    }
+    Navigator.pushReplacementNamed(context, isLoggedIn ? "/home" : "/login");
   }
 
   @override
