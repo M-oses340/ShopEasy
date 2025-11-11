@@ -13,8 +13,7 @@ class AdminHome extends StatefulWidget {
   State<AdminHome> createState() => _AdminHomeState();
 }
 
-class _AdminHomeState extends State<AdminHome>
-    with SingleTickerProviderStateMixin {
+class _AdminHomeState extends State<AdminHome> {
   bool _isLoggingOut = false;
 
   Future<void> _handleLogout(BuildContext context) async {
@@ -41,7 +40,6 @@ class _AdminHomeState extends State<AdminHome>
     setState(() => _isLoggingOut = true);
 
     try {
-      // Clean up provider state
       Provider.of<AdminProvider>(context, listen: false).cancelProvider();
       await AuthService().logout();
 
@@ -154,7 +152,7 @@ class _AdminHomeState extends State<AdminHome>
             ),
           ),
 
-          // Logout overlay with blur effect
+          // Logout overlay with blur + dim effect
           if (_isLoggingOut)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
