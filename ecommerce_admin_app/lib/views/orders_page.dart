@@ -13,9 +13,11 @@ class OrdersPage extends StatefulWidget {
 }
 
 class _OrdersPageState extends State<OrdersPage> {
-  totalQuantityCalculator(List<OrderProductModel> products) {
+  int totalQuantityCalculator(List<OrderProductModel> products) {
     int qty = 0;
-    products.map((e) => qty += e.quantity).toList();
+    for (var e in products) {
+      qty += e.quantity;
+    }
     return qty;
   }
 
@@ -52,9 +54,9 @@ class _OrdersPageState extends State<OrdersPage> {
       height: 70,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withAlpha((0.15 * 255).round()),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withAlpha((0.3 * 255).round())),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Center(
         child: Column(
@@ -75,6 +77,7 @@ class _OrdersPageState extends State<OrdersPage> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -86,8 +89,11 @@ class _OrdersPageState extends State<OrdersPage> {
         builder: (context, value, child) {
           List<OrdersModel> orders = OrdersModel.fromJsonList(value.orders);
           if (orders.isEmpty) {
-            return const Center(
-              child: Text("No orders found"),
+            return Center(
+              child: Text(
+                "No orders found",
+                style: TextStyle(color: theme.colorScheme.onSurface),
+              ),
             );
           }
 
@@ -107,7 +113,7 @@ class _OrdersPageState extends State<OrdersPage> {
                 padding: const EdgeInsets.all(16),
                 margin: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.deepPurple.shade50,
+                  color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: GridView.count(
@@ -182,6 +188,7 @@ class ViewOrder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text("Order - ${order.name}")),
       body: SingleChildScrollView(
@@ -191,16 +198,25 @@ class ViewOrder extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text("Customer: ${order.name}",
-                  style: const TextStyle(
-                      fontSize: 18, fontWeight: FontWeight.bold)),
-              Text("Phone: ${order.phone}"),
-              Text("Email: ${order.email}"),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface)),
+              Text("Phone: ${order.phone}",
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+              Text("Email: ${order.email}",
+                  style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
               const SizedBox(height: 20),
-              Text("Status: ${order.status}"),
-              Text("Ordered: ${formatRelativeTime(order.created_at)}"),
+              Text("Status: ${order.status}",
+                  style: TextStyle(color: theme.colorScheme.onSurface)),
+              Text("Ordered: ${formatRelativeTime(order.created_at)}",
+                  style: TextStyle(color: theme.colorScheme.onSurface)),
               const SizedBox(height: 20),
-              const Text("Items:",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              Text("Items:",
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface)),
               const SizedBox(height: 8),
               Column(
                 children: order.products
@@ -208,7 +224,7 @@ class ViewOrder extends StatelessWidget {
                   padding: const EdgeInsets.all(8),
                   margin: const EdgeInsets.symmetric(vertical: 4),
                   decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
+                      color: theme.colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8)),
                   child: Row(
                     children: [
@@ -217,10 +233,13 @@ class ViewOrder extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                           child: Text(item.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.w500))),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w500,
+                                  color: theme.colorScheme.onSurface))),
                       Text(
-                          "${item.quantity} x KSh${item.single_price} = KSh${item.total_price}"),
+                          "${item.quantity} x KSh${item.single_price} = KSh${item.total_price}",
+                          style: TextStyle(
+                              color: theme.colorScheme.onSurface)),
                     ],
                   ),
                 ))
@@ -228,11 +247,15 @@ class ViewOrder extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               Text("Discount: KSh${order.discount}",
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface)),
               Text("Total: KSh${order.total}",
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold)),
+                  style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.onSurface)),
             ],
           ),
         ),
