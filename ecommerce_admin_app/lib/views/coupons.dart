@@ -15,7 +15,8 @@ class _CouponsPageState extends State<CouponsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final db = DbService.instance; // Use singleton
+    final db = DbService.instance;
+    final theme = Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(title: const Text("Coupons")),
@@ -43,6 +44,7 @@ class _CouponsPageState extends State<CouponsPage> {
                   return ListTile(
                     title: Text(coupon.code),
                     subtitle: Text(coupon.desc),
+                    tileColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 30),
                     onTap: _isLoading
                         ? null
                         : () => _showAddOrUpdateCoupon(context, coupon),
@@ -78,7 +80,9 @@ class _CouponsPageState extends State<CouponsPage> {
           final messenger = ScaffoldMessenger.of(context);
           try {
             await DbService.instance.deleteCoupon(coupon.id);
-            messenger.showSnackBar(const SnackBar(content: Text("Coupon deleted successfully.")));
+            messenger.showSnackBar(
+              const SnackBar(content: Text("Coupon deleted successfully.")),
+            );
           } catch (e) {
             messenger.showSnackBar(SnackBar(content: Text("Error deleting coupon: $e")));
           } finally {
@@ -145,7 +149,11 @@ class _ModifyCouponState extends State<ModifyCoupon> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+
     return AlertDialog(
+      backgroundColor: theme.colorScheme.surface,
       title: Text(widget.id.isNotEmpty ? "Update Coupon" : "Add Coupon"),
       content: SingleChildScrollView(
         child: Form(
@@ -155,9 +163,9 @@ class _ModifyCouponState extends State<ModifyCoupon> {
             children: [
               const Text("All coupon codes will be converted to uppercase"),
               const SizedBox(height: 10),
-              _buildTextField(controller: codeController, label: "Coupon Code"),
+              _buildTextField(controller: codeController, label: "Coupon Code", theme: theme),
               const SizedBox(height: 10),
-              _buildTextField(controller: descController, label: "Description"),
+              _buildTextField(controller: descController, label: "Description", theme: theme),
               const SizedBox(height: 10),
               TextFormField(
                 controller: discountController,
@@ -172,7 +180,7 @@ class _ModifyCouponState extends State<ModifyCoupon> {
                 decoration: InputDecoration(
                   labelText: "Discount (%)",
                   filled: true,
-                  fillColor: Colors.deepPurple.shade50,
+                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 40),
                 ),
               ),
             ],
@@ -192,14 +200,18 @@ class _ModifyCouponState extends State<ModifyCoupon> {
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required ThemeData theme,
+  }) {
     return TextFormField(
       controller: controller,
       validator: (v) => v == null || v.isEmpty ? "This can't be empty." : null,
       decoration: InputDecoration(
         labelText: label,
         filled: true,
-        fillColor: Colors.deepPurple.shade50,
+        fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 40),
       ),
     );
   }
