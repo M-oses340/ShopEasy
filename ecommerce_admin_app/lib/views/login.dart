@@ -80,7 +80,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Authenticate to access your admin account',
-        biometricOnly: false, // Allows PIN fallback
+        biometricOnly: false,
       );
 
       if (!authenticated) {
@@ -88,7 +88,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // ✅ Retrieve stored credentials quickly
       final email = await _storage.read(key: "user_email");
       final password = await _storage.read(key: "user_password");
 
@@ -97,7 +96,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // ✅ If already logged in, skip Firebase delay
+      // Sign in only if needed
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -108,12 +107,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       await _storage.write(key: "logged_in", value: "true");
 
-      // ✅ Instantly transition to home
+      // 🎬 Smooth transition: fade blur out + navigate home at once
       if (!mounted) return;
-      await _blurController.reverse();
       setState(() => _isLoading = false);
+      _blurController.reverse();
 
-      Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
+      // Slight delay so blur animation finishes as we navigate
+      await Future.delayed(const Duration(milliseconds: 180));
+
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
+      }
     } catch (e) {
       debugPrint("Biometric login failed: $e");
       await _blurController.reverse();
