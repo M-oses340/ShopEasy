@@ -18,11 +18,9 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   @override
   void initState() {
     super.initState();
-
     _user = FirebaseAuth.instance.currentUser;
 
     if (_user == null) {
-      // If no user is logged in, redirect to login
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.pushReplacementNamed(context, '/login');
       });
@@ -33,7 +31,6 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     if (_user == null) return;
 
     setState(() => _isSending = true);
-
     try {
       await _user!.sendEmailVerification();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -55,12 +52,19 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
     if (_user == null) return;
 
     setState(() => _isRefreshing = true);
-
     await _user!.reload();
     _user = FirebaseAuth.instance.currentUser;
 
     if (_user!.emailVerified) {
+      // Email verified → mark as logged in
       await _storage.write(key: "logged_in", value: "true");
+
+      // Optionally enable biometric login automatically
+      final useBiometric = await _storage.read(key: "use_biometric");
+      if (useBiometric != "true") {
+        await _storage.write(key: "use_biometric", value: "true");
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Email verified! Logging in...")),
       );
@@ -70,7 +74,6 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
         const SnackBar(content: Text("Email not verified yet")),
       );
     }
-
     setState(() => _isRefreshing = false);
   }
 
@@ -83,7 +86,6 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
   @override
   Widget build(BuildContext context) {
     if (_user == null) {
-      // Show empty container while redirecting
       return const Scaffold(body: SizedBox.shrink());
     }
 

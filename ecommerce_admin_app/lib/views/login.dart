@@ -36,11 +36,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
     _blurAnimation = Tween<double>(begin: 0.0, end: 6.0).animate(_blurController);
 
-    // Trigger biometric login if enabled
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadBiometricPreference();
+
       final loggedIn = await _storage.read(key: "logged_in");
-      if (_useBiometric && loggedIn == "true") {
+      final biometricRegistered = await _storage.read(key: "biometric_registered");
+
+      if (_useBiometric && loggedIn == "true" && biometricRegistered == "true") {
+        await Future.delayed(const Duration(milliseconds: 300));
         await _tryBiometricLogin();
       }
     });
@@ -66,36 +69,41 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
       final available = await _localAuth.getAvailableBiometrics();
-      debugPrint('Biometric login attempt: canCheck=$canCheck, supported=$isSupported, available=$available');
 
       if (!canCheck || !isSupported || available.isEmpty) return;
 
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Authenticate to access your admin account',
-        biometricOnly: false,
+        biometricOnly: false, // allows PIN fallback
       );
 
       if (!authenticated) return;
 
-      // Biometric authentication succeeded, go straight to Home
+      // Get stored credentials
+      final email = await _storage.read(key: "user_email");
+      final password = await _storage.read(key: "user_password");
+
+      if (email == null) {
+        debugPrint("No stored email for biometric login.");
+        return;
+      }
+
+      // Sign in silently if no Firebase user
+      if (FirebaseAuth.instance.currentUser == null && password != null) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      }
+
       await _storage.write(key: "logged_in", value: "true");
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
-
     } catch (e) {
       debugPrint("Biometric login failed: $e");
     } finally {
       _authInProgress = false;
     }
-  }
-
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
-    _blurController.dispose();
-    super.dispose();
   }
 
   Future<void> _handleLogin() async {
@@ -110,15 +118,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
+
       final user = credential.user;
       if (user == null) throw Exception("User not found");
 
-      await user.reload();
+      // First-time login: check email verification
       if (!user.emailVerified) {
+        await user.sendEmailVerification();
         await _blurController.reverse();
         setState(() => _isLoading = false);
         Navigator.pushReplacementNamed(context, '/verify-email');
         return;
+      }
+
+      // Store credentials for future biometric login if user opts in
+      if (_useBiometric) {
+        await _storage.write(key: "user_email", value: email);
+        await _storage.write(key: "user_password", value: password); // optional
+        await _storage.write(key: "biometric_registered", value: "true");
       }
 
       await _storage.write(key: "logged_in", value: "true");
@@ -129,7 +146,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         const SnackBar(content: Text("Login Successful")),
       );
 
-      if (mounted) Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
+      }
     } on FirebaseAuthException catch (e) {
       await _blurController.reverse();
       setState(() => _isLoading = false);
@@ -185,6 +204,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   }
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _blurController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
@@ -201,18 +228,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      "Login",
-                      style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-                    ),
+                    Text("Login", style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    Text(
-                      "Access your admin account",
-                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
-                    ),
+                    Text("Access your admin account", style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                     const SizedBox(height: 30),
-
-                    // Email
                     TextFormField(
                       controller: _emailController,
                       enabled: !_isLoading,
@@ -228,8 +247,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                     ),
                     const SizedBox(height: 15),
-
-                    // Password
                     TextFormField(
                       controller: _passwordController,
                       enabled: !_isLoading,
@@ -244,16 +261,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         ),
                       ),
                     ),
-
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _isLoading ? null : _handleForgotPassword,
-                        child: const Text("Forgot Password?"),
-                      ),
+                      child: TextButton(onPressed: _isLoading ? null : _handleForgotPassword, child: const Text("Forgot Password?")),
                     ),
-
-                    // Biometric toggle
                     Row(
                       children: [
                         Switch(
@@ -274,10 +285,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         const Expanded(child: Text("Use biometric / PIN for next login")),
                       ],
                     ),
-
                     const SizedBox(height: 20),
-
-                    // Login button
                     SizedBox(
                       width: double.infinity,
                       height: 55,
@@ -301,20 +309,18 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               ),
             ),
           ),
-
-          // Loading overlay
           AnimatedBuilder(
             animation: _blurAnimation,
             builder: (context, _) => AnimatedOpacity(
               duration: const Duration(milliseconds: 200),
               opacity: _isLoading ? 1.0 : 0.0,
               child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: _blurAnimation.value,
-                  sigmaY: _blurAnimation.value,
-                ),
+                filter: ImageFilter.blur(sigmaX: _blurAnimation.value, sigmaY: _blurAnimation.value),
                 child: Container(
-                  color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.4),
+                  color: isDark
+                      ? Colors.black.withValues(alpha: 0.4)
+                      : Colors.white.withValues(alpha: 0.4),
+
                   child: _isLoading ? const Center(child: CircularProgressIndicator()) : const SizedBox.shrink(),
                 ),
               ),
