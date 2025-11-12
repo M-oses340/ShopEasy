@@ -65,7 +65,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     if (_authInProgress) return;
     _authInProgress = true;
 
-    if (!mounted) return;
     setState(() => _isLoading = true);
     await _blurController.forward();
 
@@ -74,39 +73,56 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final isSupported = await _localAuth.isDeviceSupported();
       final available = await _localAuth.getAvailableBiometrics();
 
-      if (!canCheck || !isSupported || available.isEmpty) return;
+      if (!canCheck || !isSupported || available.isEmpty) {
+        debugPrint("Biometric not available or supported.");
+        return;
+      }
 
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Authenticate to access your admin account',
-        biometricOnly: false, // allows PIN fallback
+        biometricOnly: false, // Allows PIN fallback
       );
 
-      if (!authenticated) return;
+      if (!authenticated) {
+        debugPrint("Biometric auth canceled or failed.");
+        return;
+      }
 
-      // Get stored credentials
+      // ✅ Retrieve stored credentials quickly
       final email = await _storage.read(key: "user_email");
       final password = await _storage.read(key: "user_password");
 
-      if (email == null || password == null) return;
+      if (email == null || password == null) {
+        debugPrint("No valid user found for biometric login.");
+        return;
+      }
 
-      // Sign in silently if no Firebase user
-      if (FirebaseAuth.instance.currentUser == null) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
+      // ✅ If already logged in, skip Firebase delay
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
       }
 
       await _storage.write(key: "logged_in", value: "true");
 
+      // ✅ Instantly transition to home
       if (!mounted) return;
+      await _blurController.reverse();
+      setState(() => _isLoading = false);
+
       Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
     } catch (e) {
       debugPrint("Biometric login failed: $e");
-    } finally {
-      if (!mounted) return;
-      _authInProgress = false;
-      setState(() => _isLoading = false);
       await _blurController.reverse();
+      setState(() => _isLoading = false);
+    } finally {
+      _authInProgress = false;
     }
   }
+
 
 
   Future<void> _handleLogin() async {
