@@ -108,36 +108,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         await _blurController.reverse();
         setState(() => _isLoading = false);
 
-        // 🔹 Ask user to verify email
-        await showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text("Email not verified"),
-            content: const Text(
-              "Please verify your email before logging in.\nWould you like to resend the verification link?",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Cancel"),
-              ),
-              TextButton(
-                onPressed: () async {
-                  await user.sendEmailVerification();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Verification email sent")),
-                  );
-                },
-                child: const Text("Resend Email"),
-              ),
-            ],
-          ),
-        );
+        // Redirect to Verify Email Page
+        Navigator.pushReplacementNamed(context, '/verify-email');
         return;
       }
 
-      // ✅ Email verified, proceed
+      // Email verified, proceed with login
       await _storage.write(key: "logged_in", value: "true");
       await _blurController.reverse();
       setState(() => _isLoading = false);
@@ -172,6 +148,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       );
     }
   }
+
 
   Future<void> _handleForgotPassword() async {
     if (_emailController.text.isEmpty) {

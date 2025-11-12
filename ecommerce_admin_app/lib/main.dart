@@ -13,6 +13,7 @@ import 'package:ecommerce_admin_app/views/orders_page.dart';
 import 'package:ecommerce_admin_app/views/products_page.dart';
 import 'package:ecommerce_admin_app/views/promo_banners_page.dart';
 import 'package:ecommerce_admin_app/views/signup.dart';
+import 'package:ecommerce_admin_app/views/verify_email.dart';
 import 'package:ecommerce_admin_app/views/view_product.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -143,6 +144,7 @@ class MyApp extends StatelessWidget {
               "/promos": (context) => const PromoBannersPage(),
               "/coupons": (context) => const CouponsPage(),
               "/orders": (context) => const OrdersPage(),
+              "/verify-email": (context) => const VerifyEmailPage(),
             },
           );
         },
