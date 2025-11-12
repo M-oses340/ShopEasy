@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class VerifyEmailPage extends StatefulWidget {
   const VerifyEmailPage({super.key});
@@ -9,18 +10,30 @@ class VerifyEmailPage extends StatefulWidget {
 }
 
 class _VerifyEmailPageState extends State<VerifyEmailPage> {
-  bool _isLoading = false;
-  late User? _user;
+  final _storage = const FlutterSecureStorage();
+  User? _user;
+  bool _isSending = false;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
     super.initState();
+
     _user = FirebaseAuth.instance.currentUser;
+
+    if (_user == null) {
+      // If no user is logged in, redirect to login
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(context, '/login');
+      });
+    }
   }
 
-  Future<void> _resendVerificationEmail() async {
+  Future<void> _sendVerificationEmail() async {
     if (_user == null) return;
-    setState(() => _isLoading = true);
+
+    setState(() => _isSending = true);
+
     try {
       await _user!.sendEmailVerification();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -28,77 +41,113 @@ class _VerifyEmailPageState extends State<VerifyEmailPage> {
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e")),
+        SnackBar(
+          content: Text("Error: $e"),
+          backgroundColor: Colors.red.shade400,
+        ),
       );
     } finally {
-      setState(() => _isLoading = false);
+      setState(() => _isSending = false);
     }
   }
 
-  Future<void> _checkVerification() async {
+  Future<void> _refreshVerificationStatus() async {
     if (_user == null) return;
-    setState(() => _isLoading = true);
+
+    setState(() => _isRefreshing = true);
+
     await _user!.reload();
     _user = FirebaseAuth.instance.currentUser;
+
     if (_user!.emailVerified) {
+      await _storage.write(key: "logged_in", value: "true");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email verified! Redirecting...")),
+        const SnackBar(content: Text("Email verified! Logging in...")),
       );
       Navigator.pushNamedAndRemoveUntil(context, '/home', (_) => false);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Email not verified yet.")),
+        const SnackBar(content: Text("Email not verified yet")),
       );
     }
-    setState(() => _isLoading = false);
+
+    setState(() => _isRefreshing = false);
+  }
+
+  Future<void> _logout() async {
+    await FirebaseAuth.instance.signOut();
+    await _storage.delete(key: "logged_in");
+    Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_user == null) {
+      // Show empty container while redirecting
+      return const Scaffold(body: SizedBox.shrink());
+    }
+
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Verify Email")),
+      appBar: AppBar(
+        title: const Text("Verify Email"),
+        backgroundColor: theme.colorScheme.primary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _logout,
+            tooltip: "Logout",
+          ),
+        ],
+      ),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.email_outlined, size: 80, color: Colors.orange),
+            Icon(Icons.email, size: 80, color: theme.colorScheme.primary),
             const SizedBox(height: 20),
             Text(
-              "Your email is not verified",
-              style: theme.textTheme.titleLarge,
+              "A verification email has been sent to:",
+              style: theme.textTheme.titleMedium,
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
-            const Text(
-              "Please verify your email to continue using the app.",
+            Text(
+              _user!.email ?? "No email",
+              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _resendVerificationEmail,
-              child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Resend Verification Email"),
+            ElevatedButton.icon(
+              icon: _isSending
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+                  : const Icon(Icons.send),
+              label: const Text("Resend Verification Email"),
+              onPressed: _isSending ? null : _sendVerificationEmail,
+              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
             ),
             const SizedBox(height: 15),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _checkVerification,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: _isLoading
-                  ? const CircularProgressIndicator(color: Colors.white)
-                  : const Text("Check Verification Status"),
+            ElevatedButton.icon(
+              icon: _isRefreshing
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+                  : const Icon(Icons.refresh),
+              label: const Text("Refresh Status"),
+              onPressed: _isRefreshing ? null : _refreshVerificationStatus,
+              style: ElevatedButton.styleFrom(minimumSize: const Size.fromHeight(50)),
             ),
-            const SizedBox(height: 15),
+            const SizedBox(height: 30),
             TextButton(
-              onPressed: _isLoading
-                  ? null
-                  : () {
-                FirebaseAuth.instance.signOut();
-                Navigator.pushNamedAndRemoveUntil(
-                    context, '/login', (_) => false);
-              },
+              onPressed: _logout,
               child: const Text("Back to Login"),
             ),
           ],

@@ -1,5 +1,4 @@
 import 'dart:ui';
-//import 'package:ecommerce_admin_app/controllers/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -24,7 +23,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _useBiometric = false;
   bool _obscurePassword = true;
 
-
   late AnimationController _blurController;
   late Animation<double> _blurAnimation;
 
@@ -38,10 +36,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
     _blurAnimation = Tween<double>(begin: 0.0, end: 6.0).animate(_blurController);
 
-    // Load biometric preference and auto-login if enabled
+    // Trigger biometric login if enabled
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadBiometricPreference();
-      if (_useBiometric) _tryBiometricLogin();
+      final loggedIn = await _storage.read(key: "logged_in");
+      if (_useBiometric && loggedIn == "true") {
+        await _tryBiometricLogin();
+      }
     });
   }
 
@@ -64,23 +65,30 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
-      if (!canCheck || !isSupported) return;
+      final available = await _localAuth.getAvailableBiometrics();
+      debugPrint('Biometric login attempt: canCheck=$canCheck, supported=$isSupported, available=$available');
+
+      if (!canCheck || !isSupported || available.isEmpty) return;
 
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Authenticate to access your admin account',
-        biometricOnly: false, // works with local_auth ^3.0.0
+        biometricOnly: false,
       );
 
-      if (authenticated && mounted) {
-        await _storage.write(key: "logged_in", value: "true");
-        Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
-      }
+      if (!authenticated) return;
+
+      // Biometric authentication succeeded, go straight to Home
+      await _storage.write(key: "logged_in", value: "true");
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
+
     } catch (e) {
       debugPrint("Biometric login failed: $e");
     } finally {
       _authInProgress = false;
     }
   }
+
 
   @override
   void dispose() {
@@ -102,20 +110,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
-
       final user = credential.user;
       if (user == null) throw Exception("User not found");
 
+      await user.reload();
       if (!user.emailVerified) {
         await _blurController.reverse();
         setState(() => _isLoading = false);
-
-        // Redirect to Verify Email Page
         Navigator.pushReplacementNamed(context, '/verify-email');
         return;
       }
 
-      // Email verified, proceed with login
       await _storage.write(key: "logged_in", value: "true");
       await _blurController.reverse();
       setState(() => _isLoading = false);
@@ -124,9 +129,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         const SnackBar(content: Text("Login Successful")),
       );
 
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
-      }
+      if (mounted) Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
     } on FirebaseAuthException catch (e) {
       await _blurController.reverse();
       setState(() => _isLoading = false);
@@ -150,7 +153,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       );
     }
   }
-
 
   Future<void> _handleForgotPassword() async {
     if (_emailController.text.isEmpty) {
@@ -201,9 +203,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   children: [
                     Text(
                       "Login",
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+                      style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -212,7 +212,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                     const SizedBox(height: 30),
 
-                    // EMAIL
+                    // Email
                     TextFormField(
                       controller: _emailController,
                       enabled: !_isLoading,
@@ -229,32 +229,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                     const SizedBox(height: 15),
 
-                    // PASSWORD
+                    // Password
                     TextFormField(
                       controller: _passwordController,
                       enabled: !_isLoading,
-                      obscureText: _obscurePassword, // use the state variable
-                      validator: (v) => v != null && v.length >= 8
-                          ? null
-                          : "Password must be at least 8 characters",
+                      obscureText: _obscurePassword,
+                      validator: (v) => v != null && v.length >= 8 ? null : "Password must be at least 8 characters",
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: "Password",
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                          ),
-                          onPressed: _isLoading
-                              ? null
-                              : () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                          onPressed: _isLoading ? null : () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                     ),
-
 
                     Align(
                       alignment: Alignment.centerRight,
@@ -264,7 +253,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                     ),
 
-                    // BIOMETRIC TOGGLE
+                    // Biometric toggle
                     Row(
                       children: [
                         Switch(
@@ -282,14 +271,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             await _saveBiometricPreference(v);
                           },
                         ),
-                        const Expanded(
-                            child: Text("Use biometric / PIN for next login")),
+                        const Expanded(child: Text("Use biometric / PIN for next login")),
                       ],
                     ),
 
                     const SizedBox(height: 20),
 
-                    // LOGIN BUTTON
+                    // Login button
                     SizedBox(
                       width: double.infinity,
                       height: 55,
@@ -303,28 +291,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ? const SizedBox(
                           height: 25,
                           width: 25,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
                             : const Text("Login", style: TextStyle(fontSize: 16)),
                       ),
-                    ),
-
-                    const SizedBox(height: 20),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text("Don’t have an account?"),
-                        TextButton(
-                          onPressed: _isLoading
-                              ? null
-                              : () => Navigator.pushNamed(context, "/signup"),
-                          child: const Text("Sign Up"),
-                        ),
-                      ],
                     ),
                   ],
                 ),
@@ -332,7 +302,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             ),
           ),
 
-          // LOADING OVERLAY
+          // Loading overlay
           AnimatedBuilder(
             animation: _blurAnimation,
             builder: (context, _) => AnimatedOpacity(
@@ -344,12 +314,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   sigmaY: _blurAnimation.value,
                 ),
                 child: Container(
-                  color: isDark
-                      ? Colors.black.withValues(alpha: 0.4)
-                      : Colors.white.withValues(alpha: 0.4),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : const SizedBox.shrink(),
+                  color: isDark ? Colors.black.withValues(alpha: 0.4) : Colors.white.withValues(alpha: 0.4),
+                  child: _isLoading ? const Center(child: CircularProgressIndicator()) : const SizedBox.shrink(),
                 ),
               ),
             ),
