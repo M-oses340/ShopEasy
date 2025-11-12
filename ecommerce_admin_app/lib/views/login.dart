@@ -22,6 +22,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _isLoading = false;
   bool _authInProgress = false;
   bool _useBiometric = false;
+  bool _obscurePassword = true;
+
 
   late AnimationController _blurController;
   late Animation<double> _blurAnimation;
@@ -231,15 +233,28 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     TextFormField(
                       controller: _passwordController,
                       enabled: !_isLoading,
-                      obscureText: true,
+                      obscureText: _obscurePassword, // use the state variable
                       validator: (v) => v != null && v.length >= 8
                           ? null
                           : "Password must be at least 8 characters",
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
                         labelText: "Password",
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                          ),
+                          onPressed: _isLoading
+                              ? null
+                              : () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
                       ),
                     ),
+
 
                     Align(
                       alignment: Alignment.centerRight,
