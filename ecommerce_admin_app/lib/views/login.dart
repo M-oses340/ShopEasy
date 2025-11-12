@@ -1,8 +1,9 @@
 import 'dart:ui';
-import 'package:ecommerce_admin_app/controllers/auth_service.dart';
+//import 'package:ecommerce_admin_app/controllers/auth_service.dart';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -35,7 +36,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
     _blurAnimation = Tween<double>(begin: 0.0, end: 6.0).animate(_blurController);
 
-    // Load biometric preference and try auto login if enabled
+    // Load biometric preference and auto-login if enabled
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _loadBiometricPreference();
       if (_useBiometric) _tryBiometricLogin();
@@ -63,10 +64,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final isSupported = await _localAuth.isDeviceSupported();
       if (!canCheck || !isSupported) return;
 
-      // Use the API supported by local_auth ^3.0.0
       final authenticated = await _localAuth.authenticate(
         localizedReason: 'Authenticate to access your admin account',
-        biometricOnly: false, // allows PIN fallback on devices that support it
+        biometricOnly: false, // works with local_auth ^3.0.0
       );
 
       if (authenticated && mounted) {
@@ -91,33 +91,82 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   Future<void> _handleLogin() async {
     if (!formKey.currentState!.validate()) return;
 
-    if (!mounted) return;
     setState(() => _isLoading = true);
     await _blurController.forward();
 
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
-    final result = await AuthService().loginWithEmail(email, password);
 
-    if (!mounted) return;
+    try {
+      final credential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: email, password: password);
 
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _blurController.reverse();
-    if (!mounted) return;
-    setState(() => _isLoading = false);
+      final user = credential.user;
+      if (user == null) throw Exception("User not found");
 
-    if (result == "Login Successful") {
+      if (!user.emailVerified) {
+        await _blurController.reverse();
+        setState(() => _isLoading = false);
+
+        // 🔹 Ask user to verify email
+        await showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("Email not verified"),
+            content: const Text(
+              "Please verify your email before logging in.\nWould you like to resend the verification link?",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () async {
+                  await user.sendEmailVerification();
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Verification email sent")),
+                  );
+                },
+                child: const Text("Resend Email"),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // ✅ Email verified, proceed
       await _storage.write(key: "logged_in", value: "true");
+      await _blurController.reverse();
+      setState(() => _isLoading = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Login Successful")),
       );
 
-      Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
-    } else {
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
+      }
+    } on FirebaseAuthException catch (e) {
+      await _blurController.reverse();
+      setState(() => _isLoading = false);
+      String message = "Login failed";
+      if (e.code == 'user-not-found') message = "No user found for that email.";
+      if (e.code == 'wrong-password') message = "Wrong password.";
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result, style: const TextStyle(color: Colors.white)),
+          content: Text(message, style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.red.shade400,
+        ),
+      );
+    } catch (e) {
+      await _blurController.reverse();
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Error: $e", style: const TextStyle(color: Colors.white)),
           backgroundColor: Colors.red.shade400,
         ),
       );
@@ -132,64 +181,26 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       return;
     }
 
-    if (!mounted) return;
     setState(() => _isLoading = true);
     await _blurController.forward();
 
-    final result = await AuthService().resetPassword(_emailController.text);
-
-    if (!mounted) return;
-    await Future.delayed(const Duration(milliseconds: 300));
-    await _blurController.reverse();
-    if (!mounted) return;
-    setState(() => _isLoading = false);
-
-    if (result == "Mail Sent") {
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text);
+      await _blurController.reverse();
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Password reset link sent to your email")),
       );
-      Navigator.pop(context);
-    } else {
+    } catch (e) {
+      await _blurController.reverse();
+      setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result, style: const TextStyle(color: Colors.white)),
+          content: Text("Error: $e", style: const TextStyle(color: Colors.white)),
           backgroundColor: Colors.red.shade400,
         ),
       );
     }
-  }
-
-  void _showForgotPasswordDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Forgot Password"),
-        content: TextFormField(
-          controller: _emailController,
-          enabled: !_isLoading,
-          decoration: const InputDecoration(
-            labelText: "Email",
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: _isLoading ? null : _handleForgotPassword,
-            child: _isLoading
-                ? const SizedBox(
-              height: 16,
-              width: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-                : const Text("Submit"),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -224,10 +235,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                     // EMAIL
                     TextFormField(
-                      enabled: !_isLoading,
                       controller: _emailController,
-                      autofocus: true,
-                      keyboardType: TextInputType.emailAddress,
+                      enabled: !_isLoading,
                       validator: (v) {
                         if (v == null || v.isEmpty) return "Email cannot be empty";
                         final regex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
@@ -243,11 +252,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                     // PASSWORD
                     TextFormField(
-                      enabled: !_isLoading,
                       controller: _passwordController,
+                      enabled: !_isLoading,
                       obscureText: true,
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _handleLogin(),
                       validator: (v) => v != null && v.length >= 8
                           ? null
                           : "Password must be at least 8 characters",
@@ -257,11 +264,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                     ),
 
-                    // FORGOT PASSWORD
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: _isLoading ? null : _showForgotPasswordDialog,
+                        onPressed: _isLoading ? null : _handleForgotPassword,
                         child: const Text("Forgot Password?"),
                       ),
                     ),
@@ -276,7 +282,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                               : (v) async {
                             final canCheck = await _localAuth.canCheckBiometrics;
                             if (!canCheck) {
-                              if (!mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(content: Text("Biometric not available")),
                               );
@@ -285,11 +290,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             await _saveBiometricPreference(v);
                           },
                         ),
-                        const Expanded(child: Text("Use biometric / PIN for next login")),
+                        const Expanded(
+                            child: Text("Use biometric / PIN for next login")),
                       ],
                     ),
 
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 20),
 
                     // LOGIN BUTTON
                     SizedBox(
@@ -356,7 +362,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               ),
             ),
           ),
-
         ],
       ),
     );

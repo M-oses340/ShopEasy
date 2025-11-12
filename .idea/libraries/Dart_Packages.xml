@@ -623,6 +623,7 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth-2.3.0/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth-3.0.0/lib" />
             </list>
           </value>
         </entry>
@@ -630,6 +631,7 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_android-1.0.56/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_android-2.0.0/lib" />
             </list>
           </value>
         </entry>
@@ -637,6 +639,7 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_darwin-1.6.1/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_darwin-2.0.0/lib" />
             </list>
           </value>
         </entry>
@@ -651,6 +654,7 @@
           <value>
             <list>
               <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_windows-1.0.11/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_windows-2.0.0/lib" />
             </list>
           </value>
         </entry>
@@ -1168,10 +1172,14 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/leak_tracker_testing-3.0.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/lints-3.0.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth-2.3.0/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth-3.0.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_android-1.0.56/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_android-2.0.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_darwin-1.6.1/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_darwin-2.0.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_platform_interface-1.1.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_windows-1.0.11/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/local_auth_windows-2.0.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/logging-1.2.0/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/mailer-6.1.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/matcher-0.12.17/lib" />
