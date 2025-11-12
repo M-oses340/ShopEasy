@@ -51,12 +51,15 @@ class _OrdersPageState extends State<OrdersPage> {
 
   Widget summaryBox(String label, int value, Color baseColor, BuildContext context) {
     final theme = Theme.of(context);
-    // Decide background and text color based on theme brightness
     final isDark = theme.brightness == Brightness.dark;
+
+    // Adjust background contrast
     final bgColor = isDark
-        ? baseColor.withValues(alpha: (0.25 * 255)) // darker background in dark mode
-        : baseColor.withValues(alpha: (0.15 * 255)); // lighter in light mode
-    final textColor = isDark ? Colors.white : baseColor;
+        ? baseColor.withValues(alpha: (0.25 * 255))
+        : baseColor.withValues(alpha: (0.15 * 255));
+
+    // Make sure text is visible in both modes
+    final textColor = isDark ? Colors.white : Colors.black87;
 
     return Container(
       height: 70,
@@ -93,6 +96,7 @@ class _OrdersPageState extends State<OrdersPage> {
       ),
     );
   }
+
 
 
   @override
