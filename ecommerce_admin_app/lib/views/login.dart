@@ -20,7 +20,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   bool _isLoading = false;
   bool _authInProgress = false;
-  bool _useBiometric = false;
   bool _obscurePassword = true;
 
   late AnimationController _blurController;
@@ -37,28 +36,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _blurAnimation = Tween<double>(begin: 0.0, end: 6.0).animate(_blurController);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _loadBiometricPreference();
-
       final loggedIn = await _storage.read(key: "logged_in");
       final biometricRegistered = await _storage.read(key: "biometric_registered");
 
-      if (_useBiometric && loggedIn == "true" && biometricRegistered == "true") {
+      final canCheck = await _localAuth.canCheckBiometrics;
+      final isSupported = await _localAuth.isDeviceSupported();
+
+      if (canCheck && isSupported && loggedIn == "true" && biometricRegistered == "true") {
         await Future.delayed(const Duration(milliseconds: 300));
         await _tryBiometricLogin();
       }
     });
-  }
-
-  Future<void> _loadBiometricPreference() async {
-    final pref = await _storage.read(key: "use_biometric");
-    if (!mounted) return;
-    setState(() => _useBiometric = pref == "true");
-  }
-
-  Future<void> _saveBiometricPreference(bool value) async {
-    await _storage.write(key: "use_biometric", value: value.toString());
-    if (!mounted) return;
-    setState(() => _useBiometric = value);
   }
 
   Future<void> _tryBiometricLogin() async {
@@ -84,7 +72,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       );
 
       if (!authenticated) {
-        debugPrint("Biometric auth canceled or failed.");
+        debugPrint("Biometric authentication failed or canceled.");
         return;
       }
 
@@ -92,11 +80,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final password = await _storage.read(key: "user_password");
 
       if (email == null || password == null) {
-        debugPrint("No valid user found for biometric login.");
+        debugPrint("No stored credentials for biometric login.");
         return;
       }
 
-      // Sign in only if needed
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) {
         await FirebaseAuth.instance.signInWithEmailAndPassword(
@@ -107,14 +94,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       await _storage.write(key: "logged_in", value: "true");
 
-      // 🎬 Smooth transition: fade blur out + navigate home at once
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _blurController.reverse();
+      await _blurController.reverse();
 
-      // Slight delay so blur animation finishes as we navigate
-      await Future.delayed(const Duration(milliseconds: 180));
-
+      await Future.delayed(const Duration(milliseconds: 150));
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
       }
@@ -126,8 +110,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       _authInProgress = false;
     }
   }
-
-
 
   Future<void> _handleLogin() async {
     if (!formKey.currentState!.validate()) return;
@@ -145,7 +127,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final user = credential.user;
       if (user == null) throw Exception("User not found");
 
-      // First-time login: check email verification
+      // Email verification for first-time login
       if (!user.emailVerified) {
         await user.sendEmailVerification();
         await _blurController.reverse();
@@ -154,20 +136,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // Store credentials for future biometric login if user opts in
-      if (_useBiometric) {
-        await _storage.write(key: "user_email", value: email);
-        await _storage.write(key: "user_password", value: password); // optional
-        await _storage.write(key: "biometric_registered", value: "true");
-      }
-
+      // Automatically register for biometric
+      await _storage.write(key: "user_email", value: email);
+      await _storage.write(key: "user_password", value: password);
+      await _storage.write(key: "biometric_registered", value: "true");
       await _storage.write(key: "logged_in", value: "true");
+
       await _blurController.reverse();
       setState(() => _isLoading = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Login Successful")),
-      );
 
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
@@ -251,9 +227,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Login", style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    Text("Login",
+                        style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    Text("Access your admin account", style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                    Text("Access your admin account",
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                     const SizedBox(height: 30),
                     TextFormField(
                       controller: _emailController,
@@ -274,39 +252,26 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       controller: _passwordController,
                       enabled: !_isLoading,
                       obscureText: _obscurePassword,
-                      validator: (v) => v != null && v.length >= 8 ? null : "Password must be at least 8 characters",
+                      validator: (v) =>
+                      v != null && v.length >= 8 ? null : "Password must be at least 8 characters",
                       decoration: InputDecoration(
                         border: const OutlineInputBorder(),
                         labelText: "Password",
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                          onPressed: _isLoading ? null : () => setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(
+                              _obscurePassword ? Icons.visibility : Icons.visibility_off),
+                          onPressed: _isLoading
+                              ? null
+                              : () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
                     ),
                     Align(
                       alignment: Alignment.centerRight,
-                      child: TextButton(onPressed: _isLoading ? null : _handleForgotPassword, child: const Text("Forgot Password?")),
-                    ),
-                    Row(
-                      children: [
-                        Switch(
-                          value: _useBiometric,
-                          onChanged: _isLoading
-                              ? null
-                              : (v) async {
-                            final canCheck = await _localAuth.canCheckBiometrics;
-                            if (!canCheck) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Biometric not available")),
-                              );
-                              return;
-                            }
-                            await _saveBiometricPreference(v);
-                          },
-                        ),
-                        const Expanded(child: Text("Use biometric / PIN for next login")),
-                      ],
+                      child: TextButton(
+                        onPressed: _isLoading ? null : _handleForgotPassword,
+                        child: const Text("Forgot Password?"),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
@@ -322,7 +287,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ? const SizedBox(
                           height: 25,
                           width: 25,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2),
                         )
                             : const Text("Login", style: TextStyle(fontSize: 16)),
                       ),
@@ -338,13 +304,15 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               duration: const Duration(milliseconds: 200),
               opacity: _isLoading ? 1.0 : 0.0,
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: _blurAnimation.value, sigmaY: _blurAnimation.value),
+                filter: ImageFilter.blur(
+                    sigmaX: _blurAnimation.value, sigmaY: _blurAnimation.value),
                 child: Container(
                   color: isDark
                       ? Colors.black.withValues(alpha: 0.4)
                       : Colors.white.withValues(alpha: 0.4),
-
-                  child: _isLoading ? const Center(child: CircularProgressIndicator()) : const SizedBox.shrink(),
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : const SizedBox.shrink(),
                 ),
               ),
             ),
