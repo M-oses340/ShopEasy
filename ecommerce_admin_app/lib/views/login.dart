@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:local_auth/local_auth.dart';
@@ -22,8 +23,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   bool _authInProgress = false;
   bool _obscurePassword = true;
 
-  late AnimationController _blurController;
-  late Animation<double> _blurAnimation;
+  late final AnimationController _blurController;
+  late final Animation<double> _blurAnimation;
 
   @override
   void initState() {
@@ -31,22 +32,24 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
     _blurController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 250),
     );
-    _blurAnimation = Tween<double>(begin: 0.0, end: 6.0).animate(_blurController);
+    _blurAnimation = Tween<double>(begin: 0.0, end: 5.0).animate(_blurController);
 
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final loggedIn = await _storage.read(key: "logged_in");
-      final biometricRegistered = await _storage.read(key: "biometric_registered");
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkBiometricAutoLogin());
+  }
 
-      final canCheck = await _localAuth.canCheckBiometrics;
-      final isSupported = await _localAuth.isDeviceSupported();
+  Future<void> _checkBiometricAutoLogin() async {
+    final loggedIn = await _storage.read(key: "logged_in");
+    final biometricRegistered = await _storage.read(key: "biometric_registered");
 
-      if (canCheck && isSupported && loggedIn == "true" && biometricRegistered == "true") {
-        await Future.delayed(const Duration(milliseconds: 300));
-        await _tryBiometricLogin();
-      }
-    });
+    final canCheck = await _localAuth.canCheckBiometrics;
+    final supported = await _localAuth.isDeviceSupported();
+
+    if (canCheck && supported && loggedIn == "true" && biometricRegistered == "true") {
+      await Future.delayed(const Duration(milliseconds: 300));
+      _tryBiometricLogin();
+    }
   }
 
   Future<void> _tryBiometricLogin() async {
@@ -58,11 +61,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
-      final isSupported = await _localAuth.isDeviceSupported();
-      final available = await _localAuth.getAvailableBiometrics();
+      final supported = await _localAuth.isDeviceSupported();
+      final biometrics = await _localAuth.getAvailableBiometrics();
 
-      if (!canCheck || !isSupported || available.isEmpty) {
-        debugPrint("Biometric not available or supported.");
+      if (!canCheck || !supported || biometrics.isEmpty) {
+        debugPrint("No biometrics available.");
         return;
       }
 
@@ -77,11 +80,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       }
 
       final email = await _storage.read(key: "user_email");
-      final password = await _storage.read(key: "user_password");
+      final encodedPassword = await _storage.read(key: "user_password");
 
-      if (email == null || password == null) {
+      if (email == null || encodedPassword == null) {
         debugPrint("No stored credentials for biometric login.");
         return;
+      }
+
+      // ✅ Handle both encoded and plain text passwords
+      late String password;
+      try {
+        password = utf8.decode(base64Decode(encodedPassword));
+      } catch (_) {
+        // fallback if previously stored as plain text
+        password = encodedPassword;
       }
 
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -95,17 +107,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       await _storage.write(key: "logged_in", value: "true");
 
       if (!mounted) return;
-      setState(() => _isLoading = false);
       await _blurController.reverse();
+      setState(() => _isLoading = false);
 
-      await Future.delayed(const Duration(milliseconds: 150));
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
-      }
+      Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
     } catch (e) {
-      debugPrint("Biometric login failed: $e");
-      await _blurController.reverse();
-      setState(() => _isLoading = false);
+      debugPrint("Biometric login error: $e");
+      if (mounted) {
+        await _blurController.reverse();
+        setState(() => _isLoading = false);
+      }
     } finally {
       _authInProgress = false;
     }
@@ -123,37 +134,49 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     try {
       final credential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(email: email, password: password);
-
       final user = credential.user;
+
       if (user == null) throw Exception("User not found");
 
-      // Email verification for first-time login
       if (!user.emailVerified) {
         await user.sendEmailVerification();
+        if (!mounted) return;
         await _blurController.reverse();
         setState(() => _isLoading = false);
-        Navigator.pushReplacementNamed(context, '/verify-email');
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please verify your email before logging in.")),
+        );
         return;
       }
 
-      // Automatically register for biometric
+      // ✅ Encode password for biometric storage
+      final encodedPassword = base64Encode(utf8.encode(password));
       await _storage.write(key: "user_email", value: email);
-      await _storage.write(key: "user_password", value: password);
+      await _storage.write(key: "user_password", value: encodedPassword);
       await _storage.write(key: "biometric_registered", value: "true");
       await _storage.write(key: "logged_in", value: "true");
 
+      if (!mounted) return;
       await _blurController.reverse();
       setState(() => _isLoading = false);
 
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
-      }
+      Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
     } on FirebaseAuthException catch (e) {
       await _blurController.reverse();
       setState(() => _isLoading = false);
-      String message = "Login failed";
-      if (e.code == 'user-not-found') message = "No user found for that email.";
-      if (e.code == 'wrong-password') message = "Wrong password.";
+
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = "No user found for that email.";
+          break;
+        case 'wrong-password':
+          message = "Incorrect password.";
+          break;
+        default:
+          message = "Login failed. Please try again.";
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message, style: const TextStyle(color: Colors.white)),
@@ -185,12 +208,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
     try {
       await FirebaseAuth.instance.sendPasswordResetEmail(email: _emailController.text);
+      if (!mounted) return;
       await _blurController.reverse();
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Password reset link sent to your email")),
+        const SnackBar(content: Text("Password reset link sent")),
       );
     } catch (e) {
+      if (!mounted) return;
       await _blurController.reverse();
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -219,103 +244,112 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       body: Stack(
         children: [
           SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 120),
             physics: const BouncingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 120),
-              child: Form(
-                key: formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text("Login",
-                        style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text("Access your admin account",
-                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
-                    const SizedBox(height: 30),
-                    TextFormField(
-                      controller: _emailController,
-                      enabled: !_isLoading,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return "Email cannot be empty";
-                        final regex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-                        if (!regex.hasMatch(v)) return "Enter a valid email";
-                        return null;
-                      },
-                      decoration: const InputDecoration(
-                        border: OutlineInputBorder(),
-                        labelText: "Email",
+            child: Form(
+              key: formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Login",
+                      style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  Text("Access your admin account",
+                      style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
+                  const SizedBox(height: 30),
+
+                  TextFormField(
+                    controller: _emailController,
+                    enabled: !_isLoading,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return "Email cannot be empty";
+                      if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) return "Enter a valid email";
+                      return null;
+                    },
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: "Email",
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+
+                  TextFormField(
+                    controller: _passwordController,
+                    enabled: !_isLoading,
+                    obscureText: _obscurePassword,
+                    validator: (v) =>
+                    v != null && v.length >= 8 ? null : "Password must be at least 8 characters",
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: "Password",
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                        onPressed: _isLoading
+                            ? null
+                            : () => setState(() => _obscurePassword = !_obscurePassword),
                       ),
                     ),
-                    const SizedBox(height: 15),
-                    TextFormField(
-                      controller: _passwordController,
-                      enabled: !_isLoading,
-                      obscureText: _obscurePassword,
-                      validator: (v) =>
-                      v != null && v.length >= 8 ? null : "Password must be at least 8 characters",
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: "Password",
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                              _obscurePassword ? Icons.visibility : Icons.visibility_off),
-                          onPressed: _isLoading
-                              ? null
-                              : () => setState(() => _obscurePassword = !_obscurePassword),
-                        ),
-                      ),
+                  ),
+
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _isLoading ? null : _handleForgotPassword,
+                      child: const Text("Forgot Password?"),
                     ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _isLoading ? null : _handleForgotPassword,
-                        child: const Text("Forgot Password?"),
+                  ),
+
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 55,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: theme.colorScheme.primary,
+                        foregroundColor: Colors.white,
                       ),
+                      child: _isLoading
+                          ? const SizedBox(
+                        height: 25,
+                        width: 25,
+                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                      )
+                          : const Text("Login", style: TextStyle(fontSize: 16)),
                     ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 55,
-                      child: ElevatedButton(
-                        onPressed: _isLoading ? null : _handleLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.colorScheme.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: _isLoading
-                            ? const SizedBox(
-                          height: 25,
-                          width: 25,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2),
-                        )
-                            : const Text("Login", style: TextStyle(fontSize: 16)),
-                      ),
+                  ),
+
+                  const SizedBox(height: 15),
+
+                  Center(
+                    child: IconButton(
+                      icon: const Icon(Icons.fingerprint, size: 32),
+                      onPressed: _isLoading ? null : _tryBiometricLogin,
+                      tooltip: "Login with Biometrics",
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
+
+          // Blur overlay when loading
           AnimatedBuilder(
             animation: _blurAnimation,
-            builder: (context, _) => AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: _isLoading ? 1.0 : 0.0,
-              child: BackdropFilter(
-                filter: ImageFilter.blur(
-                    sigmaX: _blurAnimation.value, sigmaY: _blurAnimation.value),
-                child: Container(
-                  color: isDark
-                      ? Colors.black.withValues(alpha: 0.4)
-                      : Colors.white.withValues(alpha: 0.4),
-                  child: _isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : const SizedBox.shrink(),
-                ),
+            builder: (context, _) => _isLoading
+                ? BackdropFilter(
+              filter: ImageFilter.blur(
+                  sigmaX: _blurAnimation.value, sigmaY: _blurAnimation.value),
+              child: Container(
+                color: isDark
+                    ? Colors.black.withValues(alpha: 0.35)
+                    : Colors.white.withValues(alpha: 0.35),
+
+                alignment: Alignment.center,
+                child: const CircularProgressIndicator(),
               ),
-            ),
+            )
+                : const SizedBox.shrink(),
           ),
         ],
       ),
