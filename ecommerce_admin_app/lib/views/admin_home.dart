@@ -4,6 +4,9 @@ import 'package:ecommerce_admin_app/controllers/auth_service.dart';
 import 'package:ecommerce_admin_app/providers/admin_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:local_auth/local_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminHome extends StatefulWidget {
   const AdminHome({super.key});
@@ -14,6 +17,51 @@ class AdminHome extends StatefulWidget {
 
 class _AdminHomeState extends State<AdminHome> {
   bool _isLoggingOut = false;
+  bool _isAuthenticating = true; // show blur/loading during biometric auth
+  final _localAuth = LocalAuthentication();
+  final _storage = const FlutterSecureStorage();
+
+  @override
+  void initState() {
+    super.initState();
+    _performBiometricAuth();
+  }
+
+  Future<void> _performBiometricAuth() async {
+    try {
+      final useBiometric = await _storage.read(key: "use_biometric") == "true";
+      final biometricRegistered = await _storage.read(key: "biometric_registered") == "true";
+
+      if (useBiometric && biometricRegistered) {
+        final canCheck = await _localAuth.canCheckBiometrics;
+        final isSupported = await _localAuth.isDeviceSupported();
+        final available = await _localAuth.getAvailableBiometrics();
+
+        if (canCheck && isSupported && available.isNotEmpty) {
+          final authenticated = await _localAuth.authenticate(
+            localizedReason: 'Authenticate to access your admin account',
+            biometricOnly: false, // allows PIN fallback
+          );
+
+          if (authenticated) {
+            final email = await _storage.read(key: "user_email");
+            final password = await _storage.read(key: "user_password");
+
+            if (FirebaseAuth.instance.currentUser == null && email != null && password != null) {
+              await FirebaseAuth.instance.signInWithEmailAndPassword(
+                email: email,
+                password: password,
+              );
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Biometric login failed: $e");
+    } finally {
+      if (mounted) setState(() => _isAuthenticating = false);
+    }
+  }
 
   Future<void> _handleLogout(BuildContext context) async {
     final shouldLogout = await showDialog<bool>(
@@ -65,10 +113,7 @@ class _AdminHomeState extends State<AdminHome> {
           _isLoggingOut
               ? const Padding(
             padding: EdgeInsets.all(12),
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white,
-            ),
+            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
           )
               : IconButton(
             icon: const Icon(Icons.logout),
@@ -96,27 +141,13 @@ class _AdminHomeState extends State<AdminHome> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        DashboardText(
-                            keyword: "Total Categories",
-                            value: "${value.categories.length}"),
-                        DashboardText(
-                            keyword: "Total Products",
-                            value: "${value.products.length}"),
-                        DashboardText(
-                            keyword: "Total Orders",
-                            value: "${value.totalOrders}"),
-                        DashboardText(
-                            keyword: "Order Not Shipped Yet",
-                            value: "${value.orderPendingProcess}"),
-                        DashboardText(
-                            keyword: "Orders Shipped",
-                            value: "${value.ordersOnTheWay}"),
-                        DashboardText(
-                            keyword: "Orders Delivered",
-                            value: "${value.ordersDelivered}"),
-                        DashboardText(
-                            keyword: "Orders Cancelled",
-                            value: "${value.ordersCancelled}"),
+                        DashboardText(keyword: "Total Categories", value: "${value.categories.length}"),
+                        DashboardText(keyword: "Total Products", value: "${value.products.length}"),
+                        DashboardText(keyword: "Total Orders", value: "${value.totalOrders}"),
+                        DashboardText(keyword: "Order Not Shipped Yet", value: "${value.orderPendingProcess}"),
+                        DashboardText(keyword: "Orders Shipped", value: "${value.ordersOnTheWay}"),
+                        DashboardText(keyword: "Orders Delivered", value: "${value.ordersDelivered}"),
+                        DashboardText(keyword: "Orders Cancelled", value: "${value.ordersCancelled}"),
                       ],
                     ),
                   ),
@@ -127,9 +158,9 @@ class _AdminHomeState extends State<AdminHome> {
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      int crossAxisCount = 2; // phones
-                      if (constraints.maxWidth > 600) crossAxisCount = 3; // tablets
-                      if (constraints.maxWidth > 900) crossAxisCount = 4; // large screens
+                      int crossAxisCount = 2;
+                      if (constraints.maxWidth > 600) crossAxisCount = 3;
+                      if (constraints.maxWidth > 900) crossAxisCount = 4;
 
                       return GridView.count(
                         crossAxisCount: crossAxisCount,
@@ -141,10 +172,8 @@ class _AdminHomeState extends State<AdminHome> {
                         children: [
                           _buildHomeButton(context, "Orders", "/orders"),
                           _buildHomeButton(context, "Products", "/products"),
-                          _buildHomeButton(context, "Promos", "/promos",
-                              arguments: {"promo": true}),
-                          _buildHomeButton(context, "Banners", "/promos",
-                              arguments: {"promo": false}),
+                          _buildHomeButton(context, "Promos", "/promos", arguments: {"promo": true}),
+                          _buildHomeButton(context, "Banners", "/promos", arguments: {"promo": false}),
                           _buildHomeButton(context, "Categories", "/category"),
                           _buildHomeButton(context, "Coupons", "/coupons"),
                         ],
@@ -156,8 +185,8 @@ class _AdminHomeState extends State<AdminHome> {
             ),
           ),
 
-          // Logout overlay with blur + dim effect
-          if (_isLoggingOut)
+          // Overlay for biometric auth or logout
+          if (_isAuthenticating || _isLoggingOut)
             AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               color: Colors.black.withValues(alpha: 0),
@@ -166,9 +195,7 @@ class _AdminHomeState extends State<AdminHome> {
                 child: Container(
                   color: Colors.black.withValues(alpha: 0.5),
                   alignment: Alignment.center,
-                  child: const CircularProgressIndicator(
-                    color: Colors.white,
-                  ),
+                  child: const CircularProgressIndicator(color: Colors.white),
                 ),
               ),
             ),
@@ -177,9 +204,7 @@ class _AdminHomeState extends State<AdminHome> {
     );
   }
 
-  // Helper: builds responsive admin buttons with hover + tap effect
-  Widget _buildHomeButton(BuildContext context, String name, String route,
-      {Object? arguments}) {
+  Widget _buildHomeButton(BuildContext context, String name, String route, {Object? arguments}) {
     return _InteractiveButton(
       name: name,
       onTap: () => Navigator.pushNamed(context, route, arguments: arguments),
@@ -187,7 +212,6 @@ class _AdminHomeState extends State<AdminHome> {
   }
 }
 
-/// Custom interactive button for hover (desktop/web) and tap (mobile)
 class _InteractiveButton extends StatefulWidget {
   final String name;
   final VoidCallback onTap;
@@ -218,9 +242,9 @@ class _InteractiveButtonState extends State<_InteractiveButton> {
           duration: const Duration(milliseconds: 150),
           curve: Curves.easeOut,
           alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..translateByDouble(0.0, _isHovering ? -4.0 : 0.0, 0.0, 1.0)
-            ..scaleByDouble(scale, scale, 1.0, 1.0),
+          transform: Matrix4.identity()..scaleByDouble(scale, scale, 1.0, 1.0),
+
+
           decoration: BoxDecoration(
             color: theme.colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(12),

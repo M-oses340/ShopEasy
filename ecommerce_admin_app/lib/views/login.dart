@@ -65,6 +65,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     if (_authInProgress) return;
     _authInProgress = true;
 
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+    await _blurController.forward();
+
     try {
       final canCheck = await _localAuth.canCheckBiometrics;
       final isSupported = await _localAuth.isDeviceSupported();
@@ -83,28 +87,27 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       final email = await _storage.read(key: "user_email");
       final password = await _storage.read(key: "user_password");
 
-      if (email == null) {
-        debugPrint("No stored email for biometric login.");
-        return;
-      }
+      if (email == null || password == null) return;
 
       // Sign in silently if no Firebase user
-      if (FirebaseAuth.instance.currentUser == null && password != null) {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
+      if (FirebaseAuth.instance.currentUser == null) {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(email: email, password: password);
       }
 
       await _storage.write(key: "logged_in", value: "true");
+
       if (!mounted) return;
       Navigator.pushNamedAndRemoveUntil(context, "/home", (_) => false);
     } catch (e) {
       debugPrint("Biometric login failed: $e");
     } finally {
+      if (!mounted) return;
       _authInProgress = false;
+      setState(() => _isLoading = false);
+      await _blurController.reverse();
     }
   }
+
 
   Future<void> _handleLogin() async {
     if (!formKey.currentState!.validate()) return;
