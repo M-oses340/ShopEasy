@@ -321,26 +321,18 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
                   const SizedBox(height: 15),
 
-                  Center(
+                  AnimatedOpacity(
+                    opacity: _isLoading ? 0.3 : 1,
+                    duration: const Duration(milliseconds: 300),
                     child: Column(
                       children: [
                         IconButton(
                           iconSize: 50,
-                          icon: Icon(
-                            Icons.fingerprint,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
+                          icon: Icon(Icons.fingerprint,
+                              color: Theme.of(context).colorScheme.primary),
                           onPressed: _isLoading ? null : _tryBiometricLogin,
-                          tooltip: "Login with Biometrics",
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          "Use Biometrics",
-                          style: TextStyle(
-                            color: Theme.of(context).colorScheme.primary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        const Text("Use Biometrics"),
                       ],
                     ),
                   ),
