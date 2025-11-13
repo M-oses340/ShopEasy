@@ -300,6 +300,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   ),
 
                   const SizedBox(height: 20),
+
+// 🔹 Login button
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -319,7 +321,30 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                   ),
 
-                  const SizedBox(height: 15),
+// 🔹 Small space
+                  const SizedBox(height: 25),
+
+// 🔹 Biometric login button positioned right below the Login button
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          "or login with biometrics",
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 14,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        IconButton(
+                          icon: const Icon(Icons.fingerprint, size: 40, color: Colors.blueAccent),
+                          onPressed: _isLoading ? null : _tryBiometricLogin,
+                          tooltip: "Login with Biometrics",
+                        ),
+                      ],
+                    ),
+                  ),
+
 
                   SizedBox(
                     width: double.infinity,
