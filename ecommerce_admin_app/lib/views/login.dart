@@ -87,12 +87,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // ✅ Handle both encoded and plain text passwords
       late String password;
       try {
         password = utf8.decode(base64Decode(encodedPassword));
       } catch (_) {
-        // fallback if previously stored as plain text
         password = encodedPassword;
       }
 
@@ -149,7 +147,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         return;
       }
 
-      // ✅ Encode password for biometric storage
       final encodedPassword = base64Encode(utf8.encode(password));
       await _storage.write(key: "user_email", value: email);
       await _storage.write(key: "user_password", value: encodedPassword);
@@ -258,6 +255,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       style: TextStyle(color: theme.colorScheme.onSurfaceVariant)),
                   const SizedBox(height: 30),
 
+                  // Email input
                   TextFormField(
                     controller: _emailController,
                     enabled: !_isLoading,
@@ -273,6 +271,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                   ),
                   const SizedBox(height: 15),
 
+                  // Password input
                   TextFormField(
                     controller: _passwordController,
                     enabled: !_isLoading,
@@ -299,9 +298,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                   ),
 
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 25),
 
-// 🔹 Login button
+                  // 🔹 Login button
                   SizedBox(
                     width: double.infinity,
                     height: 55,
@@ -321,10 +320,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                   ),
 
-// 🔹 Small space
-                  const SizedBox(height: 25),
+                  const SizedBox(height: 30),
 
-// 🔹 Biometric login button positioned right below the Login button
+                  // 🔹 Biometric login button (centered below login)
                   Center(
                     child: Column(
                       children: [
@@ -335,41 +333,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             fontSize: 14,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 10),
                         IconButton(
-                          icon: const Icon(Icons.fingerprint, size: 40, color: Colors.blueAccent),
+                          icon: const Icon(Icons.fingerprint, size: 50, color: Colors.blueAccent),
                           onPressed: _isLoading ? null : _tryBiometricLogin,
                           tooltip: "Login with Biometrics",
                         ),
                       ],
                     ),
                   ),
-
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _handleLogin,
-                      icon: const Icon(Icons.login),
-                      label: const Text("Login", style: TextStyle(fontSize: 16)),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Center(
-                    child: IconButton(
-                      icon: const Icon(Icons.fingerprint, size: 34),
-                      onPressed: _isLoading ? null : _tryBiometricLogin,
-                      tooltip: "Login with Biometrics",
-                    ),
-                  ),
-
                 ],
               ),
             ),
           ),
 
-          // Blur overlay when loading
+          // Blur overlay
           AnimatedBuilder(
             animation: _blurAnimation,
             builder: (context, _) => _isLoading
@@ -380,7 +358,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 color: isDark
                     ? Colors.black.withValues(alpha: 0.35)
                     : Colors.white.withValues(alpha: 0.35),
-
                 alignment: Alignment.center,
                 child: const CircularProgressIndicator(),
               ),
